@@ -1,0 +1,138 @@
+{
+  "app": {
+    "name": "DockWatch",
+    "description": "Docker Container Monitoring and Management"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "create": "Create",
+    "update": "Update",
+    "edit": "Edit",
+    "view": "View",
+    "search": "Search",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "info": "Info",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "refresh": "Refresh",
+    "settings": "Settings",
+    "logout": "Logout",
+    "login": "Login",
+    "username": "Username",
+    "password": "Password"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "containers": "Containers",
+    "stacks": "Stacks",
+    "hosts": "Hosts",
+    "alerts": "Alerts",
+    "settings": "Settings",
+    "images": "Images",
+    "volumes": "Volumes",
+    "networks": "Networks"
+  },
+  "container": {
+    "title": "Containers",
+    "create": "Create Container",
+    "name": "Container Name",
+    "image": "Image",
+    "status": {
+      "running": "Running",
+      "stopped": "Stopped",
+      "paused": "Paused",
+      "restarting": "Restarting",
+      "dead": "Dead",
+      "unknown": "Unknown"
+    },
+    "actions": {
+      "start": "Start",
+      "stop": "Stop",
+      "restart": "Restart",
+      "pause": "Pause",
+      "unpause": "Resume",
+      "delete": "Delete",
+      "logs": "Logs",
+      "stats": "Stats"
+    },
+    "metrics": {
+      "cpu": "CPU Usage",
+      "memory": "Memory Usage",
+      "network": "Network I/O",
+      "disk": "Disk I/O"
+    },
+    "form": {
+      "ports": "Port Mappings",
+      "volumes": "Volume Mappings",
+      "environment": "Environment Variables",
+      "command": "Command",
+      "memory_limit": "Memory Limit",
+      "cpu_limit": "CPU Limit"
+    }
+  },
+  "stack": {
+    "title": "Docker Stacks",
+    "create": "Deploy Stack",
+    "name": "Stack Name",
+    "compose_file": "Docker Compose",
+    "status": {
+      "running": "Running",
+      "stopped": "Stopped",
+      "deploying": "Deploying",
+      "failed": "Failed"
+    }
+  },
+  "host": {
+    "title": "Docker Hosts",
+    "add": "Add Host",
+    "name": "Host Name",
+    "socket_path": "Socket Path",
+    "api_version": "API Version",
+    "status": {
+      "connected": "Connected",
+      "disconnected": "Disconnected",
+      "error": "Error"
+    }
+  },
+  "alert": {
+    "title": "Alerts",
+    "severity": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "types": {
+      "cpu_high": "High CPU Usage",
+      "memory_high": "High Memory Usage",
+      "container_down": "Container Down",
+      "container_restarted": "Container Restarted"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "notifications": "Notifications",
+    "security": "Security",
+    "advanced": "Advanced",
+    "poll_interval": "Poll Interval",
+    "cpu_threshold": "CPU Threshold",
+    "memory_threshold": "Memory Threshold",
+    "metrics_ttl": "Metrics TTL",
+    "auto_recovery": "Auto Recovery"
+  },
+  "error": {
+    "generic": "An error occurred",
+    "not_found": "Resource not found",
+    "unauthorized": "Unauthorized access",
+    "validation": "Validation error",
+    "docker_error": "Docker API error",
+    "database_error": "Database error"
+  }
+}
