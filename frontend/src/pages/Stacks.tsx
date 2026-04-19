@@ -1,12 +1,13 @@
-import { useEffect, useState, FormEvent } from 'react'
+import { useEffect, useState, FormEvent, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
-import { Plus, Play, Square, Trash2, Layers } from 'lucide-react'
+import { Plus, Play, Square, Trash2, Layers, FileCode, ArrowLeft } from 'lucide-react'
+import Editor from '@monaco-editor/react'
 import type { Stack } from '@/types'
 
 function Stacks() {
-  const { logout } = useAuth()
+  const { logout } = useAuth() 
   const [stacks, setStacks] = useState<Stack[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [showForm, setShowForm] = useState<boolean>(false)
@@ -16,11 +17,12 @@ function Stacks() {
   })
   const [error, setError] = useState<string>('')
   const [success, setSuccess] = useState<string>('')
+  const editorRef = useRef<any>(null)
 
   const fetchStacks = async () => {
     try {
       const data = await api.getStacks()
-      setStacks(data)
+      setStacks(Array.isArray(data) ? data : [])
     } catch (err) {
       console.error('Failed to fetch stacks:', err)
     } finally {
@@ -143,19 +145,80 @@ function Stacks() {
                 <label className="block text-sm font-medium text-gray-400 mb-1">
                   Docker Compose YAML *
                 </label>
-                <textarea
-                  value={newStack.compose_file}
-                  onChange={(e) => setNewStack({ ...newStack, compose_file: e.target.value })}
-                  required
-                  rows={12}
-                  className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={`version: '3'
+                <div className="flex gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const template = `version: '3'
 services:
   web:
     image: nginx:latest
     ports:
-      - "80:80"`}
-                />
+      - "80:80"
+    restart: unless-stopped
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  db-data:`
+                      setNewStack({ ...newStack, compose_file: template })
+                      if (editorRef.current) {
+                        editorRef.current.setValue(template)
+                      }
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    Load Web Server Example
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const template = `version: '3'
+services:
+  app:
+    image: node:18
+    command: npm start
+    working_dir: /app
+    volumes:
+      - ./:/app
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=development`
+                      setNewStack({ ...newStack, compose_file: template })
+                      if (editorRef.current) {
+                        editorRef.current.setValue(template)
+                      }
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300"
+                  >
+                    Load Node.js Example
+                  </button>
+                </div>
+                <div className="border border-gray-600 rounded overflow-hidden">
+                  <Editor
+                    height="350px"
+                    defaultLanguage="yaml"
+                    theme="vs-dark"
+                    value={newStack.compose_file}
+                    onChange={(value) => setNewStack({ ...newStack, compose_file: value || '' })}
+                    onMount={(editor) => { editorRef.current = editor }}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      lineNumbers: 'on',
+                      scrollBeyondLastLine: false,
+                      automaticLayout: true,
+                      tabSize: 2,
+                    }}
+                  />
+                </div>
               </div>
 
               <div className="flex gap-2">
@@ -178,9 +241,9 @@ services:
           </div>
         )}
 
-        {loading && stacks.length === 0 ? (
+        {loading && (!stacks || stacks.length === 0) ? (
           <div className="text-center py-12 text-gray-400">Loading stacks...</div>
-        ) : stacks.length === 0 ? (
+        ) : !stacks || stacks.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <Layers className="w-16 h-16 mx-auto mb-4 text-gray-600" />
             <p>No stacks deployed yet</p>

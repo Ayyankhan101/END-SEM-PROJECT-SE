@@ -1,10 +1,12 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Save, RefreshCw, Settings as SettingsIcon, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Save, RefreshCw, Settings as SettingsIcon, AlertCircle, Sun, Moon, Shield, ShieldCheck, KeyRound, X } from 'lucide-react'
 import { api } from '@/services/api'
+import { useAuth } from '@/App'
 import type { Settings as SettingsType } from '@/types'
 
 function Settings() {
+  const { theme, setTheme } = useAuth()
   const [loading, setLoading] = useState<boolean>(true)
   const [saving, setSaving] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -17,10 +19,28 @@ function Settings() {
     recovery_enabled: true,
     jwt_expiration_hours: 24
   })
+  
+  const [show2FAModal, setShow2FAModal] = useState(false)
+  const [twoFactorCode, setTwoFactorCode] = useState('')
+  const [twoFactorLoading, setTwoFactorLoading] = useState(false)
+  const [qrCode, setQrCode] = useState<string | null>(null)
+  const [secret, setSecret] = useState<string | null>(null)
+  const [disablePassword, setDisablePassword] = useState('')
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false)
 
   useEffect(() => {
     loadSettings()
+    load2FAStatus()
   }, [])
+
+  const load2FAStatus = async () => {
+    try {
+      const data = await api.getSettings()
+      setIs2FAEnabled(data.two_factor_enabled || false)
+    } catch (err) {
+      console.error('Failed to load 2FA status:', err)
+    }
+  }
 
   const loadSettings = async () => {
     try {
@@ -78,6 +98,71 @@ function Settings() {
         </Link>
 
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
+
+        <div className="bg-gray-800 p-4 rounded-lg mb-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            <span className="font-medium">Theme</span>
+          </div>
+          <button
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              theme === 'dark' 
+                ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400' 
+                : 'bg-blue-600 hover:bg-blue-500 text-white'
+            }`}
+          >
+            {theme === 'dark' ? 'Dark' : 'Light'}
+          </button>
+        </div>
+
+        <div className="bg-gray-800 p-4 rounded-lg mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {is2FAEnabled ? <ShieldCheck className="w-5 h-5 text-green-500" /> : <Shield className="w-5 h-5 text-gray-400" />}
+              <span className="font-medium">Two-Factor Authentication</span>
+              {is2FAEnabled && (
+                <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded">Enabled</span>
+              )}
+            </div>
+            {is2FAEnabled ? (
+              <button
+                onClick={() => {
+                  setTwoFactorCode('')
+                  setDisablePassword('')
+                  setShow2FAModal(true)
+                }}
+                className="px-4 py-2 rounded-lg font-medium bg-red-600 hover:bg-red-500 text-white"
+              >
+                Disable 2FA
+              </button>
+            ) : (
+              <button
+                onClick={async () => {
+                  try {
+                    const data = await api.setup2FA(1, '')
+                    if (data.qr_code) {
+                      setQrCode(data.qr_code)
+                      setSecret(data.secret)
+                      setTwoFactorCode('')
+                      setShow2FAModal(true)
+                    }
+                  } catch (err) {
+                    console.error('2FA setup failed:', err)
+                  }
+                }}
+                className="px-4 py-2 rounded-lg font-medium bg-blue-600 hover:bg-blue-500 text-white"
+              >
+                Enable 2FA
+              </button>
+            )}
+          </div>
+          <p className="text-gray-400 text-sm mt-2">
+            {is2FAEnabled 
+              ? 'Your account is protected with Google Authenticator'
+              : 'Add an extra layer of security using Google Authenticator'}
+          </p>
+        </div>
 
         {error && (
           <div className="bg-red-500/10 border border-red-500 text-red-400 px-4 py-3 rounded-lg mb-4 flex items-center gap-2">
@@ -189,6 +274,117 @@ function Settings() {
             </button>
           </div>
         </form>
+
+        {show2FAModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-gray-800 p-6 rounded-lg w-[480px]">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold">
+                  {is2FAEnabled ? 'Disable 2FA' : 'Enable 2FA'}
+                </h3>
+                <button onClick={() => setShow2FAModal(false)} className="text-gray-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {!is2FAEnabled && qrCode && (
+                <div className="mb-4 text-center">
+                  <img src={qrCode} alt="QR Code" className="w-48 h-48 mx-auto mb-4" />
+                  {secret && (
+                    <div className="bg-gray-700 p-2 rounded text-sm font-mono mb-4">
+                      Secret: {secret}
+                    </div>
+                  )}
+                  <p className="text-gray-400 text-sm mb-2">
+                    Scan QR code with Google Authenticator or enter secret manually
+                  </p>
+                </div>
+              )}
+
+              {is2FAEnabled ? (
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm text-gray-400 mb-1">Your Password</label>
+                  <input
+                    type="password"
+                    value={disablePassword}
+                    onChange={(e) => setDisablePassword(e.target.value)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                    placeholder="Enter your password"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm text-gray-400 mb-1">Verification Code (OTP)</label>
+                  <input
+                    type="text"
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(e.target.value)}
+                    className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                    placeholder="Enter current 6-digit code"
+                    maxLength={6}
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="mb-4">
+                <label className="block text-sm text-gray-400 mb-1">Verification Code</label>
+                <input
+                  type="text"
+                  value={twoFactorCode}
+                  onChange={(e) => setTwoFactorCode(e.target.value)}
+                  className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
+                  placeholder="Enter 6-digit code from authenticator"
+                  maxLength={6}
+                />
+              </div>
+            )}
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShow2FAModal(false)}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (is2FAEnabled) {
+                      if (!disablePassword) {
+                        setError('Password required')
+                        return
+                      }
+                      try {
+                        await api.disable2FA(1, twoFactorCode, disablePassword)
+                        setIs2FAEnabled(false)
+                        setShow2FAModal(false)
+                        setSuccess('2FA disabled')
+                      } catch (err: any) {
+                        setError(err.response?.data?.detail || 'Failed to disable 2FA')
+                      }
+                    } else {
+                      if (!twoFactorCode || twoFactorCode.length !== 6) {
+                        setError('Enter 6-digit code')
+                        return
+                      }
+                      try {
+                        await api.setup2FA(1, twoFactorCode)
+                        setIs2FAEnabled(true)
+                        setShow2FAModal(false)
+                        setSuccess('2FA enabled')
+                      } catch (err: any) {
+                        setError(err.response?.data?.detail || 'Invalid verification code')
+                      }
+                    }
+                  }}
+                  disabled={twoFactorLoading}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded disabled:opacity-50"
+                >
+                  {twoFactorLoading ? 'Processing...' : (is2FAEnabled ? 'Disable 2FA' : 'Verify & Enable')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
