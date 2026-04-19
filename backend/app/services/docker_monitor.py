@@ -4,7 +4,7 @@ Docker monitoring orchestrator that coordinates all Docker-related services.
 import asyncio
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Any, AsyncIterator
 
 from app.core.config import get_config
 from app.services.docker_client import DockerClientService, get_docker_client_service
@@ -121,11 +121,75 @@ class DockerMonitor:
             return self._container_service.get_container_logs(container_id, lines, tail)
         return None
     
+    async def stream_container_logs(self, container_id: str, lines: int = 100) -> AsyncIterator[str]:
+        """Stream container logs in real-time."""
+        if self._container_service:
+            async for line in self._container_service.stream_logs(container_id, lines):
+                yield line
+    
     def create_container(self, config: dict) -> Optional[dict]:
         """Create a new container."""
         if self._container_service:
             return self._container_service.create_container(config)
         return None
+    
+    def remove_container(self, container_id: str) -> bool:
+        """Remove a container."""
+        if self._container_service:
+            return self._container_service.remove_container(container_id)
+        return False
+    
+    def exec_in_container(self, container_id: str, cmd: List[str], tty: bool = True, stdin: bool = False) -> Optional[dict]:
+        """Execute a command in a container."""
+        if self._container_service:
+            return self._container_service.exec_in_container(container_id, cmd, tty, stdin)
+        return None
+    
+    def start_exec(self, exec_id: str):
+        """Start an exec instance."""
+        if self._container_service:
+            return self._container_service.start_exec(exec_id)
+        return None
+
+    def update_container_env(self, container_id: str, env_vars: Dict[str, str]) -> bool:
+        """Update container environment variables (live update)."""
+        if not self.docker_client:
+            return False
+        try:
+            container = self.docker_client.containers.get(container_id)
+            current_env = container.attrs.get('Config', {}).get('Env', [])
+            env_dict = {}
+            for env in current_env:
+                if '=' in env:
+                    key, val = env.split('=', 1)
+                    env_dict[key] = val
+            env_dict.update(env_vars)
+            new_env = [f"{k}={v}" for k, v in env_dict.items()]
+            container.update(env=new_env)
+            logger.info(f"Updated env vars for container {container_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update env vars for {container_id}: {e}")
+            return False
+    
+    def update_container_ports(self, container_id: str, port_bindings: Dict[str, int]) -> bool:
+        """Update container port mappings (live update)."""
+        if not self.docker_client:
+            return False
+        try:
+            container = self.docker_client.containers.get(container_id)
+            current_ports = container.attrs.get('NetworkSettings', {}).get('Ports', {})
+            new_bindings = {}
+            for container_port, host_port in port_bindings.items():
+                if not container_port.endswith('/tcp'):
+                    container_port = f"{container_port}/tcp"
+                new_bindings[container_port] = [{'HostPort': str(host_port)}]
+            container.update(port_bindings=new_bindings)
+            logger.info(f"Updated port bindings for container {container_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to update ports for {container_id}: {e}")
+            return False
     
     # Metrics operations - delegate to MetricsService
     def get_container_stats(self, container_id: str) -> Optional[dict]:

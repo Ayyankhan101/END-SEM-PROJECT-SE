@@ -6,7 +6,7 @@ import { Plus, Trash2, RefreshCw, Server, CheckCircle, XCircle } from 'lucide-re
 import type { Host } from '@/types'
 
 function Hosts() {
-  const { logout } = useAuth()
+  const { logout } = useAuth() 
   const [hosts, setHosts] = useState<Host[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [showForm, setShowForm] = useState<boolean>(false)

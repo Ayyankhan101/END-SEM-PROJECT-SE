@@ -6,10 +6,19 @@ from slowapi.errors import RateLimitExceeded
 import logging
 import asyncio
 
-from app.api import endpoints, websocket, audit, notifications, backup, docker_resources
-from app.db.database import init_db
+from app.api import (
+    endpoints,
+    websocket,
+    audit,
+    notifications,
+    backup,
+    docker_resources,
+    health,
+)
+from app.db.models import init_db
 from app.services.docker_monitor import get_docker_monitor
 from app.services.cleanup_service import run_periodic_cleanup
+from app.services.scheduler_service import run_scheduler
 from app.core.config import load_config
 from app.core.security import create_initial_user
 from app.core.cors import get_cors_config
@@ -40,6 +49,9 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(run_periodic_cleanup())
     logger.info("Metrics cleanup job started")
+
+    asyncio.create_task(run_scheduler())
+    logger.info("Scheduler service started")
 
     yield
 
@@ -72,6 +84,7 @@ app.include_router(audit.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
 app.include_router(docker_resources.router, prefix="/api")
+app.include_router(health.router, prefix="/api")
 
 
 @app.get("/")

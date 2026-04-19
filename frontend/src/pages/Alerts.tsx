@@ -22,7 +22,7 @@ function Alerts() {
     fetchAlerts()
   }, [])
 
-  const getSeverityColor = (severity: AlertSeverity): string => {
+  const getSeverityColor = (severity: string): string => {
     switch (severity) {
       case 'critical': return 'text-red-400 bg-red-500/20'
       case 'warning': return 'text-yellow-400 bg-yellow-500/20'

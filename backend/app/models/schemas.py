@@ -9,6 +9,7 @@ class ContainerBase(BaseModel):
     name: str
     image: Optional[str] = None
     status: Optional[str] = None
+    group: Optional[str] = "default"
 
 
 class ContainerCreate(ContainerBase):
@@ -26,6 +27,8 @@ class ContainerResponse(ContainerBase):
 class ContainerDetail(ContainerResponse):
     metrics: List["MetricResponse"] = []
     alerts: List["AlertResponse"] = []
+    config: Optional[dict] = None
+    network_settings: Optional[dict] = None
 
 
 class MetricBase(BaseModel):
@@ -92,6 +95,8 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    requires_2fa: Optional[bool] = False
+    user_id: Optional[int] = None
 
 
 class ContainerConfig(BaseModel):

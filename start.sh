@@ -13,11 +13,11 @@ set -a
 source .env
 set +a
 
-if [ -z "$DOCKWATCH_JWT_SECRET" ]; then
-    echo "⚠️  DOCKWATCH_JWT_SECRET not set. Generating one..."
-    export DOCKWATCH_JWT_SECRET=$(openssl rand -base64 32)
-    echo "DOCKWATCH_JWT_SECRET=$DOCKWATCH_JWT_SECRET" >> .env
-    echo "✅ Generated JWT secret"
+if [ -z "$DOCKWATCH_JWT_SECRET" ] || [ ${#DOCKWATCH_JWT_SECRET} -lt 32 ]; then
+    echo "⚠️  DOCKWATCH_JWT_SECRET not set or too short. Generating one..."
+    export DOCKWATCH_JWT_SECRET=$(openssl rand -hex 32)
+    sed -i "s|DOCKWATCH_JWT_SECRET=.*|DOCKWATCH_JWT_SECRET=$DOCKWATCH_JWT_SECRET|" .env
+    echo "✅ Generated JWT secret (32+ chars)"
 fi
 
 echo "🐳 Building and starting containers..."

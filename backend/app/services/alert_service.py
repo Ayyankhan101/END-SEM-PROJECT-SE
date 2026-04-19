@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from app.db.database import get_session
-from app.db.models import Alert, Container
+from app.db.models import Alert, Container, AlertRule
 from app.core.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,42 @@ class AlertService:
     
     def __init__(self):
         self.config = get_config()
+    
+    def get_container_rule(self, container_id: str) -> Optional[AlertRule]:
+        """Get alert rule for a specific container."""
+        session = get_session()
+        try:
+            rule = session.query(AlertRule).filter(
+                AlertRule.container_id == container_id,
+                AlertRule.enabled == 1
+            ).first()
+            return rule
+        finally:
+            session.close()
+    
+    def get_global_rule(self) -> Optional[AlertRule]:
+        """Get the global alert rule."""
+        session = get_session()
+        try:
+            rule = session.query(AlertRule).filter(
+                AlertRule.container_id == None,
+                AlertRule.enabled == 1
+            ).first()
+            return rule
+        finally:
+            session.close()
+    
+    def get_thresholds(self, container_id: str) -> Dict[str, float]:
+        """Get effective thresholds for a container (container-specific or global)."""
+        rule = self.get_container_rule(container_id)
+        if rule:
+            return {"cpu": rule.cpu_threshold, "memory": rule.memory_threshold}
+        
+        global_rule = self.get_global_rule()
+        if global_rule:
+            return {"cpu": global_rule.cpu_threshold, "memory": global_rule.memory_threshold}
+        
+        return {"cpu": self.config.monitoring.cpu_threshold, "memory": self.config.monitoring.memory_threshold}
     
     def create_alert(
         self, 
@@ -103,26 +139,28 @@ class AlertService:
         Returns:
             List of alert dictionaries if thresholds exceeded
         """
-        config = self.config.monitoring
+        thresholds = self.get_thresholds(container_id)
+        cpu_threshold = thresholds["cpu"]
+        memory_threshold = thresholds["memory"]
+        
         alerts = []
         
         cpu_percent = stats.get("cpu_percent", 0)
-        if cpu_percent > config.cpu_threshold:
+        if cpu_percent > cpu_threshold:
             alerts.append({
                 "type": "cpu_threshold",
-                "message": f"CPU usage {cpu_percent:.1f}% exceeds threshold {config.cpu_threshold}%",
+                "message": f"CPU usage {cpu_percent:.1f}% exceeds threshold {cpu_threshold}%",
                 "severity": "warning" if cpu_percent < 95 else "critical"
             })
         
         memory_percent = stats.get("memory_percent", 0)
-        if memory_percent > config.memory_threshold:
+        if memory_percent > memory_threshold:
             alerts.append({
                 "type": "memory_threshold",
-                "message": f"Memory usage {memory_percent:.1f}% exceeds threshold {config.memory_threshold}%",
+                "message": f"Memory usage {memory_percent:.1f}% exceeds threshold {memory_threshold}%",
                 "severity": "warning" if memory_percent < 95 else "critical"
             })
         
-        # Create alerts in database
         for alert_data in alerts:
             self.create_alert(
                 container_id=container_id,
