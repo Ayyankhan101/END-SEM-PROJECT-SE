@@ -635,6 +635,31 @@ async def test_host(
     return {"status": "success", "connected": connected}
 
 
+@router.post("/hosts/{host_id}/activate")
+@limiter.limit("10/minute")
+async def activate_host(
+    request: Request,
+    host_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Activate a Docker host (switch current connection)."""
+    from app.services.docker_monitor import get_docker_monitor
+
+    host = db.query(Host).filter(Host.id == host_id).first()
+    if not host:
+        raise HTTPException(status_code=404, detail="Host not found")
+
+    monitor = get_docker_monitor()
+    connected = monitor.switch_host(host.socket_path, host.api_version)
+
+    host.status = "connected" if connected else "disconnected"
+    host.last_seen = datetime.utcnow()
+    db.commit()
+
+    return {"status": "success", "connected": connected, "host": host.name}
+
+
 @router.get("/settings", response_model=SettingsResponse)
 async def get_settings(
     db: Session = Depends(get_db),

@@ -1,4 +1,24 @@
 services:
+  # PostgreSQL service (optional - for production)
+  # To use Postgres: set DOCKWATCH_DB_TYPE=postgresql in environment
+  # and uncomment this service
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     - POSTGRES_DB=dockwatch
+  #     - POSTGRES_USER=dockwatch
+  #     - POSTGRES_PASSWORD=${DOCKWATCH_DB_PASSWORD:-changeme}
+  #   volumes:
+  #     - ./data/postgres:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U dockwatch"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
   backend:
     build:
       context: ./backend
@@ -11,7 +31,9 @@ services:
       - ./data:/app/data
     environment:
       - DOCKWATCH_CONFIG=/app/config/config.yaml
+      - DOCKWATCH_DB_TYPE=${DOCKWATCH_DB_TYPE:-sqlite}
       - DOCKWATCH_DB_PATH=/app/data/dockwatch.db
+      - DOCKWATCH_DB_URL=postgresql://dockwatch:${DOCKWATCH_DB_PASSWORD:-changeme}@postgres:5432/dockwatch
       - DOCKWATCH_DOCKER_SOCKET=/var/run/docker.sock
       - DOCKWATCH_JWT_SECRET=${DOCKWATCH_JWT_SECRET}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}

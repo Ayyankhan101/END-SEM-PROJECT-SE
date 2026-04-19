@@ -23,7 +23,7 @@ type Theme = 'dark' | 'light'
 
 interface AuthContextType {
   token: string | null;
-  login: (newToken: string) => void;
+  login: (newToken: string, userId?: number) => void;
   logout: () => void;
   socket: WebSocket | null;
   containers: any[];
@@ -33,6 +33,7 @@ interface AuthContextType {
   isConnected: boolean;
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  userId: number | null;
 }
 
 const defaultContext: AuthContextType = {
@@ -46,7 +47,8 @@ const defaultContext: AuthContextType = {
   setAlerts: () => {},
   isConnected: false,
   theme: 'dark',
-  setTheme: () => {}
+  setTheme: () => {},
+  userId: null
 };
 
 const AuthContext = createContext<AuthContextType>(defaultContext)
@@ -58,6 +60,10 @@ const RECONNECT_DELAY = 5000
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'))
+  const [userId, setUserId] = useState<number | null>(() => {
+    const saved = localStorage.getItem('userId')
+    return saved ? parseInt(saved) : null
+  })
   const [socket, setSocket] = useState<WebSocket | null>(null)
   const [containers, setContainers] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
@@ -169,14 +175,20 @@ function App() {
     }
   }, [token, connectSocket])
 
-  const login = (newToken: string) => {
+  const login = (newToken: string, newUserId?: number) => {
     localStorage.setItem('token', newToken)
     setToken(newToken)
+    if (newUserId) {
+      localStorage.setItem('userId', String(newUserId))
+      setUserId(newUserId)
+    }
   }
 
   const logout = () => {
     localStorage.removeItem('token')
+    localStorage.removeItem('userId')
     setToken(null)
+    setUserId(null)
     setIsConnected(false)
     if (socketRef.current) {
       socketRef.current.close()
@@ -186,7 +198,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <AuthContext.Provider value={{ token, login, logout, socket, containers, setContainers, alerts, setAlerts, isConnected, theme, setTheme }}>
+      <AuthContext.Provider value={{ token, userId, login, logout, socket, containers, setContainers, alerts, setAlerts, isConnected, theme, setTheme }}>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={!token ? <Login /> : <Navigate to="/" />} />

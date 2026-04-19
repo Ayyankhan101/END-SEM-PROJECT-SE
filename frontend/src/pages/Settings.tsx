@@ -6,7 +6,7 @@ import { useAuth } from '@/App'
 import type { Settings as SettingsType } from '@/types'
 
 function Settings() {
-  const { theme, setTheme } = useAuth()
+  const { theme, setTheme, userId } = useAuth()
   const [loading, setLoading] = useState<boolean>(true)
   const [saving, setSaving] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -140,7 +140,7 @@ function Settings() {
               <button
                 onClick={async () => {
                   try {
-                    const data = await api.setup2FA(1, '')
+                    const data = await api.setup2FA(userId!, '')
                     if (data.qr_code) {
                       setQrCode(data.qr_code)
                       setSecret(data.secret)
@@ -367,7 +367,7 @@ function Settings() {
                         return
                       }
                       try {
-                        await api.setup2FA(1, twoFactorCode)
+                        await api.setup2FA(userId!, twoFactorCode)
                         setIs2FAEnabled(true)
                         setShow2FAModal(false)
                         setSuccess('2FA enabled')

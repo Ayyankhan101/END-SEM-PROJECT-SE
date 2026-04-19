@@ -2,7 +2,7 @@ import { useEffect, useState, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
-import { Plus, Trash2, RefreshCw, Server, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, Trash2, RefreshCw, Server, CheckCircle, XCircle, Play } from 'lucide-react'
 import type { Host } from '@/types'
 
 function Hosts() {
@@ -67,6 +67,20 @@ function Hosts() {
       fetchHosts()
     } catch (err) {
       console.error('Failed to test host:', err)
+    }
+  }
+
+  const handleActivate = async (id: number) => {
+    try {
+      const result = await api.activateHost(id)
+      if (result.connected) {
+        alert(`Activated host: ${result.host}`)
+        fetchHosts()
+      } else {
+        alert('Failed to activate host')
+      }
+    } catch (err) {
+      console.error('Failed to activate host:', err)
     }
   }
 
@@ -192,6 +206,13 @@ function Hosts() {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => handleActivate(host.id)}
+                      className="p-2 hover:bg-gray-700 rounded text-green-500"
+                      title="Activate Host"
+                    >
+                      <Play className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => handleTest(host.id)}
                       className="p-2 hover:bg-gray-700 rounded"

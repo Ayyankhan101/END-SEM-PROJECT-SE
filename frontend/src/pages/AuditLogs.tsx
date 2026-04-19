@@ -108,6 +108,7 @@ export default function AuditLogs() {
                 <th className="px-4 py-3 text-left">Resource ID</th>
                 <th className="px-4 py-3 text-left">User</th>
                 <th className="px-4 py-3 text-left">IP</th>
+                <th className="px-4 py-3 text-left">Details</th>
               </tr>
             </thead>
             <tbody>
@@ -119,6 +120,7 @@ export default function AuditLogs() {
                   <td className="px-4 py-3 text-gray-400">{log.resource_id || '-'}</td>
                   <td className="px-4 py-3">{log.user_id || '-'}</td>
                   <td className="px-4 py-3 text-gray-400">{log.ip_address || '-'}</td>
+                  <td className="px-4 py-3 text-gray-400 text-xs">{log.details ? JSON.stringify(log.details).substring(0, 50) : '-'}</td>
                 </tr>
               ))}
             </tbody>

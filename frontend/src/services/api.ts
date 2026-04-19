@@ -232,6 +232,11 @@ class ApiClient {
     return response.data
   }
 
+  async activateHost(id: number): Promise<{ status: string; connected: boolean; host: string }> {
+    const response = await this.client.post(`/hosts/${id}/activate`)
+    return response.data
+  }
+
   // Settings endpoints
   async getSettings(): Promise<Settings> {
     const response = await this.client.get<Settings>('/settings')

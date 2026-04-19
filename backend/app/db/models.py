@@ -198,32 +198,45 @@ _engine = None
 _SessionLocal = None
 
 
-def init_db(db_path: str = None):
+def init_db(db_type: str = None, db_path: str = None, db_url: str = None):
     global _engine, _SessionLocal
 
-    # Use project data directory if no path specified
+    from app.core.config import get_config
+    config = get_config()
+    
+    # Use config values if not provided
+    if db_type is None:
+        db_type = config.database.type
     if db_path is None:
-        base_dir = Path(__file__).parent.parent.parent
-        db_path = base_dir / "data" / "dockwatch.db"
+        db_path = config.database.path
+    if db_url is None:
+        db_url = config.database.url
 
-    # Ensure data directory exists
-    db_file = Path(db_path)
-    db_file.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Create empty file if not exists (for chmod to work)
-    if not db_file.exists():
-        db_file.touch()
-        db_file.chmod(0o666)
-        db_file.parent.chmod(0o777)
+    if db_type == "postgresql" and db_url:
+        # PostgreSQL connection
+        _engine = create_engine(db_url, echo=False, pool_pre_ping=True)
+    else:
+        # SQLite connection (default)
+        if db_path is None:
+            base_dir = Path(__file__).parent.parent.parent
+            db_path = base_dir / "data" / "dockwatch.db"
 
-    _engine = create_engine(
-        f"sqlite:///{db_file}", echo=False, connect_args={"check_same_thread": False}
-    )
-    
-    # Enable WAL mode for better concurrency
-    with _engine.connect() as conn:
-        conn.execute(text("PRAGMA journal_mode=WAL"))
-        conn.commit()
+        db_file = Path(db_path)
+        db_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        if not db_file.exists():
+            db_file.touch()
+            db_file.chmod(0o666)
+            db_file.parent.chmod(0o777)
+
+        _engine = create_engine(
+            f"sqlite:///{db_file}", echo=False, connect_args={"check_same_thread": False}
+        )
+        
+        # Enable WAL mode for better concurrency
+        with _engine.connect() as conn:
+            conn.execute(text("PRAGMA journal_mode=WAL"))
+            conn.commit()
     
     _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
     Base.metadata.create_all(bind=_engine)

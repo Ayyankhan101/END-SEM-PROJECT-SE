@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { RefreshCw, Play, Pause, Wifi, WifiOff } from 'lucide-react'
 import { useAuth } from '@/App'
+import { api } from '@/services/api'
 
 interface LogViewerProps {
   containerId: string;
@@ -24,10 +25,7 @@ function LogViewer({ containerId }: LogViewerProps) {
   const fetchInitialLogs = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`/containers/${containerId}/logs?lines=${lines}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      })
-      const data = await res.json()
+      const data = await api.getContainerLogs(containerId, lines)
       if (data.logs) {
         const logLines = data.logs.split('\n').filter((l: string) => l)
         setLogs(logLines.slice(-maxBuffer))

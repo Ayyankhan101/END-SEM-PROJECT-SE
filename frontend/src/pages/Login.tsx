@@ -18,14 +18,14 @@ function Login() {
     try {
       if (requires2FA) {
         const data = await api.verify2FA(userId!, twoFactorCode)
-        authLogin(data.access_token)
+        authLogin(data.access_token, userId!)
       } else {
         const data = await api.login({ username, password })
         if (data.requires_2fa) {
           setRequires2FA(true)
           setUserId(data.user_id || null)
         } else {
-          authLogin(data.access_token)
+          authLogin(data.access_token, data.user_id)
         }
       }
     } catch (err: any) {

@@ -59,6 +59,29 @@ class DockerMonitor:
         """Test connection to a remote Docker host."""
         return self._docker_client_service.test_connection(socket_path, api_version)
     
+    def switch_host(self, socket_path: str, api_version: str = "1.41") -> bool:
+        """Switch to a different Docker host."""
+        logger.info(f"Switching to host: {socket_path}")
+        
+        # Disconnect from current host
+        self.disconnect()
+        
+        # Reconfigure and connect to new host
+        self._docker_client_service._client = None  # Reset client
+        if self._docker_client_service.connect(socket_path, api_version):
+            # Initialize dependent services with new client
+            self._container_service = ContainerService(self._docker_client_service.client)
+            self._metrics_service = MetricsService(self._docker_client_service.client)
+            self._recovery_service = RecoveryService(
+                self._container_service, 
+                self._alert_service
+            )
+            logger.info(f"Successfully switched to host: {socket_path}")
+            return True
+        
+        logger.error(f"Failed to switch to host: {socket_path}")
+        return False
+    
     def register_callback(self, callback: Callable[[dict], None]):
         """Register a callback for monitoring events."""
         # Check for duplicates

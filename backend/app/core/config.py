@@ -50,7 +50,9 @@ class RecoveryConfig(BaseModel):
 
 
 class DatabaseConfig(BaseModel):
+    type: str = "sqlite"  # "sqlite" or "postgresql"
     path: str = "dockwatch.db"
+    url: str = ""  # For PostgreSQL: postgresql://user:pass@host:5432/dbname
     metrics_ttl_days: int = 7
 
 
