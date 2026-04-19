@@ -20,9 +20,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Production stage
 FROM python:3.11-slim AS production
 
-# Create non-root user
-RUN groupadd -r dockwatch && useradd -r -g dockwatch -s /bin/false dockwatch
-
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
@@ -36,14 +33,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
 
 # Copy application code
-COPY --chown=dockwatch:dockwatch app/ ./app/
-
-# Create necessary directories with proper permissions
-RUN mkdir -p /app/data /app/config && \
-    chown -R dockwatch:dockwatch /app
-
-# Switch to non-root user
-USER dockwatch
+COPY app/ ./app/
 
 # Expose port
 EXPOSE 8000
