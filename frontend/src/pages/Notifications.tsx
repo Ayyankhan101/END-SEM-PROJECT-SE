@@ -64,12 +64,27 @@ export default function Notifications() {
     }
   }
 
+  const defaultConfigs: Record<string, Record<string, string>> = {
+    webhook: { url: '' },
+    slack: { webhook_url: '' },
+    discord: { webhook_url: '' },
+    email: { smtp_host: '', from: '', to: '' }
+  }
+
   const channelTypes = [
     { value: 'webhook', label: 'Webhook', fields: [{ name: 'url', label: 'URL' }] },
     { value: 'slack', label: 'Slack', fields: [{ name: 'webhook_url', label: 'Webhook URL' }] },
     { value: 'discord', label: 'Discord', fields: [{ name: 'webhook_url', label: 'Webhook URL' }] },
     { value: 'email', label: 'Email', fields: [{ name: 'smtp_host', label: 'SMTP Host' }, { name: 'from', label: 'From' }, { name: 'to', label: 'To' }] }
   ]
+
+  const handleTypeChange = (newType: string) => {
+    setFormData(f => ({
+      ...f,
+      channel_type: newType,
+      config: { ...defaultConfigs[newType] }
+    }))
+  }
 
   return (
     <div className="p-6">
@@ -107,11 +122,7 @@ export default function Notifications() {
               <label className="block mb-2">Type</label>
               <select
                 value={formData.channel_type}
-                onChange={e => setFormData((f) => ({ 
-                  ...f, 
-                  channel_type: e.target.value,
-                  config: { url: '' }
-                }))}
+                onChange={e => handleTypeChange(e.target.value)}
                 className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2"
               >
                 {channelTypes.map(t => (

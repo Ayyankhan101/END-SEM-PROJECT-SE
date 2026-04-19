@@ -37,7 +37,7 @@ interface Stats {
 }
 
 function Dashboard() {
-  const { containers, setContainers, logout, isConnected } = useAuth()
+  const { containers, setContainers, logout, isConnected, alerts } = useAuth()
   const [loading, setLoading] = useState<boolean>(true)
   const [searchTerm, setSearchTerm] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -50,7 +50,7 @@ function Dashboard() {
     total: 0, 
     running: 0, 
     stopped: 0, 
-    alerts: 0 
+    alerts: alerts?.length || 0 
   })
 
   const fetchContainers = useCallback(async () => {
@@ -62,7 +62,7 @@ function Dashboard() {
         total: containerList.length,
         running: containerList.filter((c: ContainerType) => c.status === 'running').length,
         stopped: containerList.filter((c: ContainerType) => c.status !== 'running').length,
-        alerts: 0
+        alerts: alerts?.length || 0
       })
     } catch (err) {
       console.error('Failed to fetch containers:', err)

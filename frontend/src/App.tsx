@@ -85,6 +85,9 @@ function App() {
   const socketRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const heartbeatIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reconnectAttemptRef = useRef(0)
+  const maxReconnectDelay = 30000
+  const baseReconnectDelay = 1000
 
   const connectSocket = useCallback(() => {
     if (!token) return
@@ -100,6 +103,7 @@ function App() {
       console.log('WebSocket connected')
       setIsConnected(true)
       setSocket(ws)
+      reconnectAttemptRef.current = 0  // Reset backoff counter on successful connect
       
       // Start heartbeat
       heartbeatIntervalRef.current = setInterval(() => {
@@ -147,8 +151,14 @@ function App() {
         clearInterval(heartbeatIntervalRef.current)
       }
       
-      // Attempt reconnect
-      reconnectTimeoutRef.current = setTimeout(connectSocket, RECONNECT_DELAY)
+      // Exponential backoff reconnect
+      const delay = Math.min(
+        baseReconnectDelay * Math.pow(2, reconnectAttemptRef.current),
+        maxReconnectDelay
+      )
+      reconnectAttemptRef.current += 1
+      console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current})`)
+      reconnectTimeoutRef.current = setTimeout(connectSocket, delay)
     }
 
     ws.onerror = (error) => {
