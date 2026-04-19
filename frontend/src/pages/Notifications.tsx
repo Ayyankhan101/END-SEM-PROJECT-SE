@@ -24,8 +24,8 @@ export default function Notifications() {
   async function loadChannels() {
     try {
       setLoading(true)
-      const data = await api.getNotificationChannels()
-      setChannels(data)
+      const data = await api.getNotificationChannels() as unknown
+      setChannels(Array.isArray(data) ? data : (data as Record<string, any>)?.channels || [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load channels')
     } finally {

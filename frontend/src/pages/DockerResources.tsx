@@ -31,11 +31,14 @@ export default function DockerResources() {
     try {
       setLoading(true)
       if (activeTab === 'images') {
-        setImages(await api.getImages())
+        const data = await api.getImages() as unknown
+        setImages(Array.isArray(data) ? data : (data as Record<string, any>)?.images || [])
       } else if (activeTab === 'volumes') {
-        setVolumes(await api.getVolumes())
+        const data = await api.getVolumes() as unknown
+        setVolumes(Array.isArray(data) ? data : (data as Record<string, any>)?.volumes || [])
       } else {
-        setNetworks(await api.getNetworks())
+        const data = await api.getNetworks() as unknown
+        setNetworks(Array.isArray(data) ? data : (data as Record<string, any>)?.networks || [])
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load resources')

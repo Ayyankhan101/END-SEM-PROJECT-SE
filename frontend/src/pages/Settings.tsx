@@ -35,8 +35,8 @@ function Settings() {
 
   const load2FAStatus = async () => {
     try {
-      const data = await api.getSettings()
-      setIs2FAEnabled(data.two_factor_enabled || false)
+      const data = (await api.getSettings()) as unknown as Record<string, any>
+      setIs2FAEnabled(data?.two_factor_enabled || false)
     } catch (err) {
       console.error('Failed to load 2FA status:', err)
     }
@@ -45,14 +45,14 @@ function Settings() {
   const loadSettings = async () => {
     try {
       setLoading(true)
-      const data = await api.getSettings()
+      const data = (await api.getSettings()) as unknown as Record<string, any>
       setSettings({
-        poll_interval: data.poll_interval,
-        cpu_threshold: data.cpu_threshold,
-        memory_threshold: data.memory_threshold,
-        metrics_ttl_days: data.metrics_ttl_days,
-        recovery_enabled: data.recovery_enabled,
-        jwt_expiration_hours: data.jwt_expiration_hours
+        poll_interval: data?.poll_interval,
+        cpu_threshold: data?.cpu_threshold,
+        memory_threshold: data?.memory_threshold,
+        metrics_ttl_days: data?.metrics_ttl_days,
+        recovery_enabled: data?.recovery_enabled,
+        jwt_expiration_hours: data?.jwt_expiration_hours
       })
     } catch (err) {
       setError('Failed to load settings')

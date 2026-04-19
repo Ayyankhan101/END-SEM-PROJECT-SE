@@ -11,6 +11,7 @@ from app.core.security import get_current_user
 from app.services.docker_client import get_docker_client_service
 from app.core.exceptions import DockerAPIError, ValidationError
 from app.core.validation import validate_string
+from app.core.rate_limiter import limiter
 
 router = APIRouter(prefix="/docker", tags=["docker-resources"])
 
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/docker", tags=["docker-resources"])
 
 
 @router.get("/images")
+@limiter.limit("60/minute")
 async def list_images(
     all_images: bool = False,
     db: Session = Depends(get_db),
@@ -46,6 +48,7 @@ async def list_images(
 
 
 @router.post("/images/pull")
+@limiter.limit("10/minute")
 async def pull_image(
     image_name: str,
     tag: str = "latest",
@@ -84,6 +87,7 @@ async def pull_image(
 
 
 @router.delete("/images/{image_id}")
+@limiter.limit("20/minute")
 async def delete_image(
     image_id: str,
     force: bool = False,
@@ -108,6 +112,7 @@ async def delete_image(
 
 
 @router.post("/images/{image_id}/tag")
+@limiter.limit("10/minute")
 async def tag_image(
     image_id: str,
     tag: str,
@@ -136,6 +141,7 @@ async def tag_image(
 
 
 @router.get("/images/{image_id}/history")
+@limiter.limit("30/minute")
 async def get_image_history(
     image_id: str,
     db: Session = Depends(get_db),
@@ -172,6 +178,7 @@ async def get_image_history(
 
 
 @router.get("/volumes")
+@limiter.limit("60/minute")
 async def list_volumes(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
@@ -200,6 +207,7 @@ async def list_volumes(
 
 
 @router.post("/volumes")
+@limiter.limit("10/minute")
 async def create_volume(
     name: str,
     driver: str = "local",
@@ -233,6 +241,7 @@ async def create_volume(
 
 
 @router.delete("/volumes/{name}")
+@limiter.limit("20/minute")
 async def delete_volume(
     name: str,
     force: bool = False,
@@ -260,6 +269,7 @@ async def delete_volume(
 
 
 @router.get("/networks")
+@limiter.limit("60/minute")
 async def list_networks(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
@@ -292,6 +302,7 @@ async def list_networks(
 
 
 @router.post("/networks")
+@limiter.limit("10/minute")
 async def create_network(
     name: str,
     driver: str = "bridge",
@@ -329,6 +340,7 @@ async def create_network(
 
 
 @router.delete("/networks/{network_id}")
+@limiter.limit("20/minute")
 async def delete_network(
     network_id: str,
     db: Session = Depends(get_db),

@@ -11,8 +11,8 @@ function Alerts() {
   useEffect(() => {
     const fetchAlerts = async () => {
       try {
-        const data = await api.getAlerts(50)
-        setAlerts(data)
+        const data = await api.getAlerts(50) as unknown
+        setAlerts(Array.isArray(data) ? data : (data as Record<string, any>)?.alerts || [])
       } catch (err) {
         console.error('Failed to fetch alerts:', err)
       } finally {

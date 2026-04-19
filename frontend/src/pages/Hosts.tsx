@@ -23,8 +23,8 @@ function Hosts() {
 
   const fetchHosts = async () => {
     try {
-      const data = await api.getHosts()
-      setHosts(data)
+      const data = await api.getHosts() as unknown
+      setHosts(Array.isArray(data) ? data : (data as Record<string, any>)?.hosts || [])
     } catch (err) {
       console.error('Failed to fetch hosts:', err)
     } finally {

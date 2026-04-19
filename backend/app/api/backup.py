@@ -16,6 +16,7 @@ from pathlib import Path
 from app.db.models import get_db, User, Container, Metric, Alert, Stack, Host, Settings
 from app.core.security import get_current_user
 from app.core.config import get_config
+from app.core.rate_limiter import limiter
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -30,6 +31,7 @@ def ensure_backup_dir():
 
 
 @router.get("/list")
+@limiter.limit("30/minute")
 async def list_backups(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
@@ -55,6 +57,7 @@ async def list_backups(
 
 
 @router.post("/create")
+@limiter.limit("5/minute")
 async def create_backup(
     background_tasks: BackgroundTasks,
     include_metrics: bool = True,
@@ -186,6 +189,7 @@ def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session)
 
 
 @router.post("/restore")
+@limiter.limit("2/minute")
 async def restore_backup(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),

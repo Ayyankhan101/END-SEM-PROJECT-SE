@@ -37,8 +37,8 @@ function Users() {
 
   const fetchUsers = async () => {
     try {
-      const data = await api.getUsers()
-      setUsers(data)
+      const data = await api.getUsers() as unknown
+      setUsers(Array.isArray(data) ? data : (data as Record<string, any>)?.users || [])
     } catch (err) {
       console.error('Failed to fetch users:', err)
     } finally {

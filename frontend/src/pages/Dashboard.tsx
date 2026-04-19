@@ -55,12 +55,13 @@ function Dashboard() {
 
   const fetchContainers = useCallback(async () => {
     try {
-      const data = await api.getContainers()
-      setContainers(data)
+      const data = await api.getContainers() as unknown
+      const containerList = Array.isArray(data) ? data : (data as Record<string, any>)?.containers || []
+      setContainers(containerList)
       setStats({
-        total: data.length,
-        running: data.filter((c: ContainerType) => c.status === 'running').length,
-        stopped: data.filter((c: ContainerType) => c.status !== 'running').length,
+        total: containerList.length,
+        running: containerList.filter((c: ContainerType) => c.status === 'running').length,
+        stopped: containerList.filter((c: ContainerType) => c.status !== 'running').length,
         alerts: 0
       })
     } catch (err) {

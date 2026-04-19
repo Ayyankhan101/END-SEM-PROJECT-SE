@@ -41,8 +41,8 @@ function ContainerCompare() {
       const results: Record<string, Metric[]> = {}
       await Promise.all(
         selectedIds.map(async (id) => {
-          const data = await api.getMetricsHistory(id, 24)
-          results[id] = data.metrics || []
+          const data = (await api.getMetricsHistory(id, 24)) as unknown as Record<string, any>
+          results[id] = data?.metrics || []
         })
       )
       setMetricsData(results)

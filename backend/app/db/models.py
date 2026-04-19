@@ -3,6 +3,7 @@ from sqlalchemy import (
     Column,
     String,
     Integer,
+    text,
     Float,
     DateTime,
     Text,
@@ -218,6 +219,12 @@ def init_db(db_path: str = None):
     _engine = create_engine(
         f"sqlite:///{db_file}", echo=False, connect_args={"check_same_thread": False}
     )
+    
+    # Enable WAL mode for better concurrency
+    with _engine.connect() as conn:
+        conn.execute(text("PRAGMA journal_mode=WAL"))
+        conn.commit()
+    
     _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
     Base.metadata.create_all(bind=_engine)
 
