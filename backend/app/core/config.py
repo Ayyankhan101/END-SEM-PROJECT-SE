@@ -1,17 +1,39 @@
 import os
 import warnings
 import yaml
+import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 REQUIRED_ENV_VARS = ["DOCKWATCH_JWT_SECRET"]
 MIN_JWT_SECRET_LENGTH = 32
 
 
 def get_default_jwt_secret():
-    """Generate a default JWT secret for development."""
-    return "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6"
+    """Generate JWT secret - dev fallback with production check."""
+    secret = os.environ.get("DOCKWATCH_JWT_SECRET", "")
+    env = os.environ.get("ENV", "development")
+    
+    if secret:
+        if len(secret) < MIN_JWT_SECRET_LENGTH:
+            raise ValueError(
+                f"DOCKWATCH_JWT_SECRET must be at least {MIN_JWT_SECRET_LENGTH} characters long. "
+            )
+        return secret
+    
+    if env == "production":
+        raise ValueError(
+            "DOCKWATCH_JWT_SECRET environment variable must be set in production. "
+            "Set ENV=development for development mode."
+        )
+    
+    # Development fallback with warning
+    logger.warning("⚠️  USING DEV SECRET - DO NOT USE IN PRODUCTION")
+    logger.warning("⚠️  Set DOCKWATCH_JWT_SECRET for production deployments")
+    return "dev-secret-only-do-not-use-in-production"
 
 
 def validate_environment() -> None:
@@ -63,9 +85,14 @@ class ServerConfig(BaseModel):
 
 
 class SecurityConfig(BaseModel):
-    jwt_secret: str = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6"
+    jwt_secret: str = ""  # Must be set via get_default_jwt_secret()
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24
+    
+    def __init__(self, **data):
+        if not data.get("jwt_secret"):
+            data["jwt_secret"] = get_default_jwt_secret()
+        super().__init__(**data)
 
 
 class LoggingConfig(BaseModel):

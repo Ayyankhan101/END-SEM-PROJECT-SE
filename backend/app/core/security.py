@@ -90,7 +90,7 @@ def create_initial_user():
             username="admin",
             hashed_password=get_password_hash("admin123"),
             role="admin",
-            must_change_password=False,
+            must_change_password=True,
         )
         db.add(user)
         db.commit()

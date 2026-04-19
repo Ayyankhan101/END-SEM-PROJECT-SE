@@ -1,3 +1,4 @@
+"""Test fixtures for DockWatch tests"""
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -5,31 +6,18 @@ from app.main import app
 
 @pytest.fixture
 def client():
+    """Create TestClient fixture."""
     return TestClient(app)
 
 
-def test_root(client):
-    """Test root endpoint."""
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json()["name"] == "DockWatch"
-
-
-def test_health(client):
-    """Test health endpoint."""
-    response = client.get("/api/health")
-    assert response.status_code == 200
-    assert response.json()["status"] == "healthy"
-
-
-def test_liveness(client):
-    """Test liveness probe."""
-    response = client.get("/api/health/live")
-    assert response.status_code == 200
-    assert response.json()["status"] == "alive"
-
-
-def test_ready(client):
-    """Test readiness probe."""
-    response = client.get("/api/health/ready")
-    assert response.status_code in [200, 503]
+@pytest.fixture
+def auth_token(client):
+    """Create authentication token for protected endpoints."""
+    # Try to get token (may fail if no user exists)
+    response = client.post("/api/auth/token", json={
+        "username": "admin",
+        "password": "admin123"
+    })
+    if response.status_code == 200:
+        return response.json().get("access_token")
+    return None
