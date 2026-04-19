@@ -365,3 +365,236 @@ export interface DockerNetwork {
   ingress: boolean;
   containers: string[];
 }
+
+export interface Schedule {
+  id: number;
+  container_id: string;
+  container_name: string;
+  action: 'start' | 'stop' | 'restart';
+  time: string;
+  enabled: boolean;
+  created_at?: string;
+}
+
+export interface ScheduleCreate {
+  container_id: string;
+  action: 'start' | 'stop' | 'restart';
+  time: string;
+}
+
+export interface ScheduleUpdate {
+  action?: 'start' | 'stop' | 'restart';
+  time?: string;
+  enabled?: boolean;
+}
+
+export interface AlertRule {
+  id: number;
+  container_id?: string;
+  container_name?: string;
+  name: string;
+  cpu_threshold: number;
+  memory_threshold: number;
+  enabled: boolean;
+  created_at?: string;
+}
+
+export interface AlertRuleCreate {
+  container_id?: string;
+  name: string;
+  cpu_threshold: number;
+  memory_threshold: number;
+  enabled: boolean;
+}
+
+export interface AlertRuleUpdate {
+  name?: string;
+  cpu_threshold?: number;
+  memory_threshold?: number;
+  enabled?: boolean;
+}
+
+export interface NotificationChannelConfig {
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  from_email?: string;
+  to_emails?: string[];
+  webhook_url?: string;
+  slack_webhook_url?: string;
+  discord_webhook_url?: string;
+}
+
+export interface Backup {
+  filename: string;
+  size: number;
+  created: string;
+  path: string;
+}
+
+export interface BulkActionResult {
+  id: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface BulkActionResponse {
+  status: string;
+  results: BulkActionResult[];
+}
+
+export interface ContainerLogs {
+  container_id: string;
+  logs: string;
+}
+
+export interface ContainerFavoriteResponse {
+  status: string;
+  is_favorite: boolean;
+}
+
+export interface ContainerEnvResponse {
+  status: string;
+  message: string;
+}
+
+export interface ContainerPortsResponse {
+  status: string;
+  message: string;
+}
+
+export interface ContainerGroupResponse {
+  id: string;
+  group: string;
+}
+
+export interface HostTestResponse {
+  status: string;
+  connected: boolean;
+}
+
+export interface HostActivateResponse {
+  status: string;
+  connected: boolean;
+  host: string;
+}
+
+export interface HealthStatus {
+  status: string;
+  timestamp: string;
+}
+
+export interface ExecCreate {
+  cmd: string[];
+  tty?: boolean;
+  stdin?: boolean;
+}
+
+export interface ExecResponse {
+  id: string;
+}
+
+export interface NetworkCreate {
+  name: string;
+  driver?: string;
+  internal?: boolean;
+  attachable?: boolean;
+  labels?: Record<string, string>;
+}
+
+export interface VolumeCreate {
+  name: string;
+  driver?: string;
+  labels?: Record<string, string>;
+}
+
+export interface AuditLogFilter {
+  skip?: number;
+  limit?: number;
+  action?: string;
+  resource_type?: string;
+  user_id?: number;
+  days?: number;
+}
+
+export interface AuditLogResponse {
+  logs: AuditLog[];
+  total: number;
+  skip: number;
+  limit: number;
+}
+
+export interface UserRole {
+  id: number;
+  username: string;
+  role: string;
+  created_at?: string;
+  updated_at?: string;
+  must_change_password?: boolean;
+}
+
+export interface UserCreateRequest {
+  username: string;
+  password: string;
+  role?: string;
+}
+
+export interface UserUpdateRequest {
+  password?: string;
+  role?: string;
+  must_change_password?: boolean;
+  force_password_change?: boolean;
+}
+
+export interface NetworkInspect {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+  internal: boolean;
+  attachable: boolean;
+  ingress: boolean;
+  ipam: {
+    driver: string;
+    config: Array<{
+      subnet?: string;
+      gateway?: string;
+    }>;
+  };
+  containers: Record<string, {
+    name: string;
+    endpoint_id: string;
+    mac_address: string;
+    ipv4_address: string;
+    ipv6_addresses: string[];
+  }>;
+}
+
+export interface ImageHistoryItem {
+  id: string;
+  created: string;
+  created_by: string;
+  size: string;
+  comment: string;
+}
+
+export interface ImagePullResponse {
+  status: string;
+  message: string;
+  image_id?: string;
+}
+
+export interface TwoFASetupResponse {
+  secret: string;
+  qr_code: string;
+}
+
+export interface TwoFAVerifyResponse {
+  access_token: string;
+}
+
+export interface LogoutAllResponse {
+  status: string;
+  message: string;
+}

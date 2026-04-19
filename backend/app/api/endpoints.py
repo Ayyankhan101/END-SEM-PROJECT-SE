@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
+from pydantic import validator
 
 from app.db.models import get_db
 from app.db.models import Container, Metric, Alert, RecoveryAction, Stack, Host
@@ -1208,11 +1209,41 @@ class ScheduleCreate(BaseModel):
     action: str
     time: str  # HH:MM format
 
+    @validator('time')
+    def validate_time_format(cls, v):
+        import re
+        if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', v):
+            raise ValueError('Time must be in HH:MM format (00:00-23:59)')
+        return v
+
+    @validator('action')
+    def validate_action(cls, v):
+        if v not in ['start', 'stop', 'restart']:
+            raise ValueError('Action must be start, stop, or restart')
+        return v
+
 
 class ScheduleUpdate(BaseModel):
     action: Optional[str] = None
     time: Optional[str] = None
     enabled: Optional[bool] = None
+
+    @validator('time')
+    def validate_time_format(cls, v):
+        if v is None:
+            return v
+        import re
+        if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', v):
+            raise ValueError('Time must be in HH:MM format (00:00-23:59)')
+        return v
+
+    @validator('action')
+    def validate_action(cls, v):
+        if v is None:
+            return v
+        if v not in ['start', 'stop', 'restart']:
+            raise ValueError('Action must be start, stop, or restart')
+        return v
 
 
 class ScheduleResponse(BaseModel):

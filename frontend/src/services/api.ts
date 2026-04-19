@@ -1,10 +1,10 @@
 import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from 'axios'
-import type { 
-  Container, 
-  ContainerDetail, 
-  Metric, 
+import type {
+  Container,
+  ContainerDetail,
+  Metric,
   MetricsHistory,
-  Alert, 
+  Alert,
   RecoveryAction,
   Stack,
   StackCreate,
@@ -15,7 +15,16 @@ import type {
   LoginRequest,
   TokenResponse,
   ContainerCreateConfig,
-  ApiResponse 
+  ApiResponse,
+  Schedule,
+  ScheduleCreate,
+  AlertRule,
+  AlertRuleCreate,
+  Backup,
+  DockerImage,
+  DockerVolume,
+  DockerNetwork,
+  AuditLog
 } from '@/types'
 
 const API_URL = '/api'  // Use relative paths - nginx handles proxying in production, vite in dev
