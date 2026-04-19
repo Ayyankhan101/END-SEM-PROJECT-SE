@@ -45,23 +45,27 @@ class MetricsService:
     
     def _calculate_metrics(self, stats: dict, container_id: str) -> Dict[str, Any]:
         """Calculate CPU and memory metrics from raw Docker stats."""
-        # Calculate CPU percentage
+        # Calculate CPU percentage with defensive checks
+        cpu_stats = stats.get("cpu_stats", {})
+        precpu_stats = stats.get("precpu_stats", {})
+        
         cpu_delta = (
-            stats["cpu_stats"]["cpu_usage"]["total_usage"]
-            - stats["precpu_stats"]["cpu_usage"]["total_usage"]
+            cpu_stats.get("cpu_usage", {}).get("total_usage", 0)
+            - precpu_stats.get("cpu_usage", {}).get("total_usage", 0)
         )
         system_delta = (
-            stats["cpu_stats"]["system_cpu_usage"]
-            - stats["precpu_stats"]["system_cpu_usage"]
+            cpu_stats.get("system_cpu_usage", 0)
+            - precpu_stats.get("system_cpu_usage", 0)
         )
-        cpu_count = stats["cpu_stats"].get("online_cpus", 1)
+        cpu_count = cpu_stats.get("online_cpus", 1)
         cpu_percent = (
             (cpu_delta / system_delta * cpu_count * 100) if system_delta > 0 else 0
         )
         
-        # Calculate memory percentage
-        mem_usage = stats["memory_stats"]["usage"]
-        mem_limit = stats["memory_stats"]["limit"]
+        # Calculate memory percentage with defensive checks
+        mem_stats = stats.get("memory_stats", {})
+        mem_usage = mem_stats.get("usage", 0)
+        mem_limit = mem_stats.get("limit", 1)
         mem_percent = (mem_usage / mem_limit * 100) if mem_limit > 0 else 0
         
         return {

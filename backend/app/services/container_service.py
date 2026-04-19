@@ -2,7 +2,8 @@
 Container operations service.
 """
 import logging
-from typing import List, Optional, Dict, Any
+import docker
+from typing import List, Optional, Dict, Any, AsyncIterator
 from docker.errors import APIError, ImageNotFound
 
 from app.core.exceptions import ContainerNotFoundException, DockerConnectionException
@@ -193,6 +194,70 @@ class ContainerService:
             logger.error(f"Failed to get logs for {container_id}: {e}")
             return None
     
+    async def stream_logs(self, container_id: str, lines: int = 100) -> AsyncIterator[str]:
+        """
+        Stream logs from a container in real-time.
+        
+        Args:
+            container_id: The container ID
+            lines: Number of lines to buffer
+            
+        Yields:
+            Log lines as they arrive
+        """
+        if not self.docker_client:
+            return
+        
+        try:
+            container = self.docker_client.containers.get(container_id)
+            log_generator = container.logs(
+                follow=True,
+                tail=lines,
+                stdout=True,
+                stderr=True,
+                timestamps=True,
+                stream=True
+            )
+            
+            buffer = []
+            max_buffer = 10000
+            
+            for line in log_generator:
+                decoded_line = line.decode("utf-8") if isinstance(line, bytes) else str(line)
+                buffer.append(decoded_line)
+                
+                if len(buffer) > max_buffer:
+                    buffer = buffer[-max_buffer:]
+                
+                yield decoded_line
+                
+        except APIError as e:
+            logger.error(f"Failed to stream logs for {container_id}: {e}")
+        except Exception as e:
+            logger.error(f"Log stream error for {container_id}: {e}")
+    
+    def remove_container(self, container_id: str) -> bool:
+        """
+        Remove a container.
+        
+        Args:
+            container_id: The container ID
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.docker_client:
+            return False
+        
+        try:
+            container = self.docker_client.containers.get(container_id)
+            container.remove(force=True)
+            logger.info(f"Removed container {container_id}")
+            return True
+        except APIError as e:
+            logger.error(f"Failed to remove {container_id}: {e}")
+            return False
+    
     def create_container(self, config: dict) -> Optional[dict]:
         """
         Create a new container.
@@ -208,11 +273,11 @@ class ContainerService:
         
         try:
             ports = config.get("ports", {})
-            port_bindings = {}
+            ports_list = []
             for container_port, host_port in ports.items():
-                port_bindings[f"{container_port}/tcp"] = host_port
+                ports_list.append(f"{host_port}:{container_port}")
 
-            volumes = config.get("volumes", [])
+            volumes = config.get("volumes") or []
             binds = []
             for vol in volumes:
                 if isinstance(vol, dict):
@@ -221,8 +286,8 @@ class ContainerService:
                     )
 
             host_config = {}
-            if port_bindings:
-                host_config["port_bindings"] = port_bindings
+            if ports_list:
+                host_config["ports"] = ports_list
             if binds:
                 host_config["binds"] = binds
 
@@ -248,6 +313,45 @@ class ContainerService:
                 "image": config["image"],
                 "status": container.status,
             }
-        except (APIError, docker.errors.ImageNotFound) as e:
+        except (APIError, ImageNotFound) as e:
             logger.error(f"Failed to create container: {e}")
+            return None
+    
+    def exec_in_container(self, container_id: str, cmd: List[str], tty: bool = True, stdin: bool = False) -> Optional[dict]:
+        """Execute a command in a container."""
+        if not self.docker_client:
+            return None
+        
+        try:
+            container = self.docker_client.containers.get(container_id)
+            
+            exec_result = container.exec_create(
+                cmd=cmd,
+                tty=tty,
+                stdin=stdin,
+                demux=True
+            )
+            
+            return {
+                "exec_id": exec_result.get("Id"),
+                "container_id": container_id
+            }
+        except APIError as e:
+            logger.error(f"Failed to exec in {container_id}: {e}")
+            return None
+    
+    def start_exec(self, exec_id: str):
+        """Start an exec instance."""
+        if not self.docker_client:
+            return None
+        
+        try:
+            return self.docker_client.exec_start(
+                exec_id=exec_id,
+                tty=True,
+                detach=False,
+                socket=True
+            )
+        except APIError as e:
+            logger.error(f"Failed to start exec {exec_id}: {e}")
             return None

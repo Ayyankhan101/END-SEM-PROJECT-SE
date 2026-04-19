@@ -48,8 +48,9 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-async def websocket_callback(data: dict):
-    await manager.broadcast(data)
+def websocket_callback(data: dict):
+    """Synchronous wrapper for async broadcast."""
+    asyncio.create_task(manager.broadcast(data))
 
 
 @router.websocket("/ws/metrics")
@@ -87,3 +88,68 @@ async def websocket_health(websocket: WebSocket):
             await asyncio.sleep(30)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+
+
+@router.websocket("/ws/logs/{container_id}")
+async def websocket_logs(websocket: WebSocket, container_id: str):
+    await websocket.accept()
+    logger.info(f"Log stream connected for container: {container_id}")
+    
+    from app.services.docker_monitor import get_docker_monitor
+    monitor = get_docker_monitor()
+    
+    try:
+        async for line in monitor.stream_container_logs(container_id, lines=100):
+            await websocket.send_text(line)
+    except Exception as e:
+        logger.error(f"Log stream error for {container_id}: {e}")
+    finally:
+        logger.info(f"Log stream disconnected for container: {container_id}")
+
+
+@router.websocket("/ws/exec/{container_id}")
+async def websocket_exec(websocket: WebSocket, container_id: str):
+    await websocket.accept()
+    logger.info(f"Exec session started for container: {container_id}")
+    
+    from app.services.docker_monitor import get_docker_monitor
+    monitor = get_docker_monitor()
+    
+    try:
+        exec_result = monitor.exec_in_container(container_id, ["/bin/sh"], tty=True, stdin=True)
+        if not exec_result:
+            await websocket.send_json({"error": "Failed to create exec session"})
+            return
+        
+        exec_id = exec_result.get("exec_id")
+        socket = monitor.start_exec(exec_id)
+        
+        async def forward_stdin():
+            try:
+                while True:
+                    data = await websocket.receive_text()
+                    if socket and hasattr(socket, 'send'):
+                        socket.send(data.encode())
+            except Exception:
+                pass
+        
+        async def forward_stdout():
+            try:
+                if socket and hasattr(socket, 'recv'):
+                    while True:
+                        data = socket.recv(4096)
+                        if data:
+                            await websocket.send_bytes(data)
+                        else:
+                            break
+            except Exception as e:
+                logger.error(f"Exec output error: {e}")
+        
+        import asyncio
+        await asyncio.gather(forward_stdin(), forward_stdout())
+        
+    except Exception as e:
+        logger.error(f"Exec error for {container_id}: {e}")
+        await websocket.send_json({"error": str(e)})
+    finally:
+        logger.info(f"Exec session ended for container: {container_id}")
