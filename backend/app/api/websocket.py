@@ -137,7 +137,7 @@ async def websocket_exec(websocket: WebSocket, container_id: str):
             try:
                 if socket and hasattr(socket, 'recv'):
                     while True:
-                        data = socket.recv(4096)
+                        data = await asyncio.to_thread(socket.recv, 4096)
                         if data:
                             await websocket.send_bytes(data)
                         else:
@@ -145,7 +145,6 @@ async def websocket_exec(websocket: WebSocket, container_id: str):
             except Exception as e:
                 logger.error(f"Exec output error: {e}")
         
-        import asyncio
         await asyncio.gather(forward_stdin(), forward_stdout())
         
     except Exception as e:
