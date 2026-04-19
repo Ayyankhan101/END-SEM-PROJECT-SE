@@ -18,7 +18,7 @@ import type {
   ApiResponse 
 } from '@/types'
 
-const API_URL = ''  // Use relative paths - nginx handles proxying in production, vite in dev
+const API_URL = '/api'  // Use relative paths - nginx handles proxying in production, vite in dev
 
 interface ApiErrorResponse {
   error?: string;

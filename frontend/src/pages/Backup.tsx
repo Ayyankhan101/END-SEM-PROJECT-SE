@@ -16,8 +16,9 @@ export default function Backup() {
   async function loadBackups() {
     try {
       setLoading(true)
-      const data = await api.listBackups()
-      setBackups(data.backups)
+      const data = await api.listBackups() as unknown
+      const backupList = (data as Record<string, any>)?.backups
+      setBackups(Array.isArray(backupList) ? backupList : [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load backups')
     } finally {
