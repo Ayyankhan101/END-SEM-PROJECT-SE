@@ -2,7 +2,7 @@
 Backup and restore API endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, File, UploadFile, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
@@ -33,6 +33,7 @@ def ensure_backup_dir():
 @router.get("/list")
 @limiter.limit("30/minute")
 async def list_backups(
+    request: Request,
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """List available backups"""
@@ -59,6 +60,7 @@ async def list_backups(
 @router.post("/create")
 @limiter.limit("5/minute")
 async def create_backup(
+    request: Request,
     background_tasks: BackgroundTasks,
     include_metrics: bool = True,
     db: Session = Depends(get_db),
@@ -191,6 +193,7 @@ def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session)
 @router.post("/restore")
 @limiter.limit("2/minute")
 async def restore_backup(
+    request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

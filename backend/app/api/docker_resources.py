@@ -2,7 +2,7 @@
 Docker resources API endpoints (images, volumes, networks)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -22,6 +22,7 @@ router = APIRouter(prefix="/docker", tags=["docker-resources"])
 @router.get("/images")
 @limiter.limit("60/minute")
 async def list_images(
+    request: Request,
     all_images: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -50,6 +51,7 @@ async def list_images(
 @router.post("/images/pull")
 @limiter.limit("10/minute")
 async def pull_image(
+    request: Request,
     image_name: str,
     tag: str = "latest",
     background_tasks: BackgroundTasks = None,
@@ -89,6 +91,7 @@ async def pull_image(
 @router.delete("/images/{image_id}")
 @limiter.limit("20/minute")
 async def delete_image(
+    request: Request,
     image_id: str,
     force: bool = False,
     db: Session = Depends(get_db),
@@ -114,6 +117,7 @@ async def delete_image(
 @router.post("/images/{image_id}/tag")
 @limiter.limit("10/minute")
 async def tag_image(
+    request: Request,
     image_id: str,
     tag: str,
     db: Session = Depends(get_db),
@@ -143,6 +147,7 @@ async def tag_image(
 @router.get("/images/{image_id}/history")
 @limiter.limit("30/minute")
 async def get_image_history(
+    request: Request,
     image_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -180,6 +185,7 @@ async def get_image_history(
 @router.get("/volumes")
 @limiter.limit("60/minute")
 async def list_volumes(
+    request: Request,
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """List Docker volumes"""
@@ -209,6 +215,7 @@ async def list_volumes(
 @router.post("/volumes")
 @limiter.limit("10/minute")
 async def create_volume(
+    request: Request,
     name: str,
     driver: str = "local",
     labels: Optional[dict] = None,
@@ -243,6 +250,7 @@ async def create_volume(
 @router.delete("/volumes/{name}")
 @limiter.limit("20/minute")
 async def delete_volume(
+    request: Request,
     name: str,
     force: bool = False,
     db: Session = Depends(get_db),
@@ -271,6 +279,7 @@ async def delete_volume(
 @router.get("/networks")
 @limiter.limit("60/minute")
 async def list_networks(
+    request: Request,
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """List Docker networks"""
@@ -304,6 +313,7 @@ async def list_networks(
 @router.post("/networks")
 @limiter.limit("10/minute")
 async def create_network(
+    request: Request,
     name: str,
     driver: str = "bridge",
     internal: bool = False,
@@ -342,6 +352,7 @@ async def create_network(
 @router.delete("/networks/{network_id}")
 @limiter.limit("20/minute")
 async def delete_network(
+    request: Request,
     network_id: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
