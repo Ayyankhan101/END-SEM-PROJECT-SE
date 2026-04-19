@@ -105,7 +105,8 @@ async def setup_2fa(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if user.totp_secret:
+    # If user already has TOTP secret and code provided, verify it
+    if user.totp_secret and code:
         totp = pyotp.TOTP(user.totp_secret)
         if not totp.verify(code):
             raise HTTPException(status_code=401, detail="Invalid verification code")
@@ -113,6 +114,8 @@ async def setup_2fa(
         user.is_2fa_enabled = 1
         db.commit()
         return {"secret": user.totp_secret, "qr_code": ""}
+    
+    # If no secret exists, generate new one for initial setup
     
     secret = pyotp.random_base32()
     user.totp_secret = secret

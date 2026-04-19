@@ -42,17 +42,26 @@ function Settings() {
     }
   }
 
+  const defaultSettings = {
+    poll_interval: 5,
+    cpu_threshold: 90,
+    memory_threshold: 90,
+    metrics_ttl_days: 7,
+    recovery_enabled: true,
+    jwt_expiration_hours: 24
+  }
+
   const loadSettings = async () => {
     try {
       setLoading(true)
       const data = (await api.getSettings()) as unknown as Record<string, any>
       setSettings({
-        poll_interval: data?.poll_interval,
-        cpu_threshold: data?.cpu_threshold,
-        memory_threshold: data?.memory_threshold,
-        metrics_ttl_days: data?.metrics_ttl_days,
-        recovery_enabled: data?.recovery_enabled,
-        jwt_expiration_hours: data?.jwt_expiration_hours
+        poll_interval: data?.poll_interval ?? defaultSettings.poll_interval,
+        cpu_threshold: data?.cpu_threshold ?? defaultSettings.cpu_threshold,
+        memory_threshold: data?.memory_threshold ?? defaultSettings.memory_threshold,
+        metrics_ttl_days: data?.metrics_ttl_days ?? defaultSettings.metrics_ttl_days,
+        recovery_enabled: data?.recovery_enabled ?? defaultSettings.recovery_enabled,
+        jwt_expiration_hours: data?.jwt_expiration_hours ?? defaultSettings.jwt_expiration_hours
       })
     } catch (err) {
       setError('Failed to load settings')
