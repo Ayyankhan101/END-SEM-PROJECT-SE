@@ -21,9 +21,9 @@ export default function AuditLogs() {
         api.getAuditLogs({ ...filter, skip: pagination.skip, limit: pagination.limit }),
         api.getAuditStats(filter.days)
       ])
-      setLogs(logsRes.logs)
-      setStats(statsRes)
-      setPagination(p => ({ ...p, total: logsRes.total }))
+      setLogs(logsRes?.logs || [])
+      setStats(statsRes || null)
+      setPagination(p => ({ ...p, total: logsRes?.total || 0 }))
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load audit logs')
     } finally {
@@ -47,19 +47,19 @@ export default function AuditLogs() {
       {stats && (
         <div className="grid grid-cols-4 gap-4 mb-6">
           <div className="bg-gray-800 rounded-lg p-4">
-            <div className="text-2xl font-bold">{stats.total_actions}</div>
+            <div className="text-2xl font-bold">{stats?.total_actions || 0}</div>
             <div className="text-gray-400">Total Actions</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
-            <div className="text-2xl font-bold">{Object.keys(stats.actions_by_type).length}</div>
+            <div className="text-2xl font-bold">{Object.keys(stats?.actions_by_type || {}).length}</div>
             <div className="text-gray-400">Action Types</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
-            <div className="text-2xl font-bold">{Object.keys(stats.resources_by_type).length}</div>
+            <div className="text-2xl font-bold">{Object.keys(stats?.resources_by_type || {}).length}</div>
             <div className="text-gray-400">Resource Types</div>
           </div>
           <div className="bg-gray-800 rounded-lg p-4">
-            <div className="text-2xl font-bold">{stats.period_days}</div>
+            <div className="text-2xl font-bold">{stats?.period_days || 7}</div>
             <div className="text-gray-400">Days</div>
           </div>
         </div>
