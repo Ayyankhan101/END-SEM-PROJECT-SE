@@ -139,8 +139,33 @@ class ApiClient {
     return response.data
   }
 
+  async stopContainer(id: string): Promise<{ status: string; message: string }> {
+    const response = await this.client.post(`/containers/${id}/stop`)
+    return response.data
+  }
+
   async createContainer(config: ContainerCreateConfig): Promise<{ status: string; container: Container }> {
     const response = await this.client.post('/containers', config)
+    return response.data
+  }
+
+  async bulkStartContainers(containerIds: string[]): Promise<{ status: string; results: { id: string; success: boolean }[] }> {
+    const response = await this.client.post('/containers/bulk/start', containerIds)
+    return response.data
+  }
+
+  async bulkStopContainers(containerIds: string[]): Promise<{ status: string; results: { id: string; success: boolean }[] }> {
+    const response = await this.client.post('/containers/bulk/stop', containerIds)
+    return response.data
+  }
+
+  async bulkRestartContainers(containerIds: string[]): Promise<{ status: string; results: { id: string; success: boolean }[] }> {
+    const response = await this.client.post('/containers/bulk/restart', containerIds)
+    return response.data
+  }
+
+  async bulkDeleteContainers(containerIds: string[]): Promise<{ status: string; results: { id: string; success: boolean; error?: string }[] }> {
+    const response = await this.client.post('/containers/bulk/delete', containerIds)
     return response.data
   }
 
@@ -221,6 +246,243 @@ class ApiClient {
   // Health check
   async checkHealth(): Promise<{ status: string; timestamp: string }> {
     const response = await this.client.get('/health')
+    return response.data
+  }
+
+  // Audit endpoints
+  async getAuditLogs(params: {
+    skip?: number;
+    limit?: number;
+    action?: string;
+    resource_type?: string;
+    user_id?: number;
+    days?: number;
+  } = {}): Promise<{ logs: any[]; total: number; skip: number; limit: number }> {
+    const response = await this.client.get('/audit/logs', { params })
+    return response.data
+  }
+
+  async getAuditStats(days: number = 7): Promise<{
+    period_days: number;
+    total_actions: number;
+    actions_by_type: Record<string, number>;
+    resources_by_type: Record<string, number>;
+    daily_activity: { date: string; count: number }[];
+  }> {
+    const response = await this.client.get('/audit/stats', { params: { days } })
+    return response.data
+  }
+
+  // Notification channel endpoints
+  async getNotificationChannels(): Promise<any[]> {
+    const response = await this.client.get('/notifications/channels')
+    return response.data
+  }
+
+  async createNotificationChannel(data: {
+    name: string;
+    channel_type: string;
+    config: Record<string, any>;
+    is_enabled?: boolean;
+  }): Promise<any> {
+    const response = await this.client.post('/notifications/channels', data)
+    return response.data
+  }
+
+  async deleteNotificationChannel(channelId: number): Promise<{ status: string; message: string }> {
+    const response = await this.client.delete(`/notifications/channels/${channelId}`)
+    return response.data
+  }
+
+  async testNotificationChannel(channelId: number): Promise<{ status: string; message: string }> {
+    const response = await this.client.post(`/notifications/channels/${channelId}/test`)
+    return response.data
+  }
+
+  // Backup endpoints
+  async listBackups(): Promise<{ backups: { filename: string; size: number; created: string; path: string }[] }> {
+    const response = await this.client.get('/backup/list')
+    return response.data
+  }
+
+  async createBackup(includeMetrics: boolean = true): Promise<{ status: string; message: string; filename: string }> {
+    const response = await this.client.post('/backup/create', null, { params: { include_metrics: includeMetrics } })
+    return response.data
+  }
+
+  async restoreBackup(file: File): Promise<{ status: string; message: string; restored: any }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await this.client.post('/backup/restore', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    return response.data
+  }
+
+  // Docker resource endpoints
+  async getImages(all: boolean = false): Promise<any[]> {
+    const response = await this.client.get('/docker/images', { params: { all } })
+    return response.data
+  }
+
+  async pullImage(imageName: string, tag: string = 'latest'): Promise<{ status: string; message: string; image_id?: string }> {
+    const response = await this.client.post('/docker/images/pull', null, { params: { image_name: imageName, tag } })
+    return response.data
+  }
+
+  async deleteImage(imageId: string, force: boolean = false): Promise<{ status: string; message: string }> {
+    const response = await this.client.delete(`/docker/images/${imageId}`, { params: { force } })
+    return response.data
+  }
+
+  async tagImage(imageId: string, newTag: string): Promise<{ status: string; message: string }> {
+    const response = await this.client.post(`/docker/images/${imageId}/tag`, null, { params: { tag: newTag } })
+    return response.data
+  }
+
+  async getImageHistory(imageId: string): Promise<any[]> {
+    const response = await this.client.get(`/docker/images/${imageId}/history`)
+    return response.data
+  }
+
+  async getVolumes(): Promise<any[]> {
+    const response = await this.client.get('/docker/volumes')
+    return response.data
+  }
+
+  async createVolume(name: string, driver: string = 'local', labels?: Record<string, string>): Promise<any> {
+    const response = await this.client.post('/docker/volumes', null, { params: { name, driver, labels } })
+    return response.data
+  }
+
+  async deleteVolume(name: string, force: boolean = false): Promise<{ status: string; message: string }> {
+    const response = await this.client.delete(`/docker/volumes/${name}`, { params: { force } })
+    return response.data
+  }
+
+  // User endpoints
+  async getUsers(): Promise<any[]> {
+    const response = await this.client.get('/users')
+    return response.data
+  }
+
+  async createUser(data: { username: string; password: string; role: string }): Promise<any> {
+    const response = await this.client.post('/users', data)
+    return response.data
+  }
+
+  async updateUser(userId: number, data: { password?: string; role?: string; must_change_password?: boolean; force_password_change?: boolean }): Promise<any> {
+    const response = await this.client.put(`/users/${userId}`, data)
+    return response.data
+  }
+
+  async deleteUser(userId: number): Promise<{ status: string; message: string }> {
+    const response = await this.client.delete(`/users/${userId}`)
+    return response.data
+  }
+
+  async updateContainerGroup(containerId: string, group: string): Promise<any> {
+    const response = await this.client.put(`/containers/${containerId}`, { group })
+    return response.data
+  }
+
+  async toggleContainerFavorite(containerId: string): Promise<{ status: string; is_favorite: boolean }> {
+    const response = await this.client.put(`/containers/${containerId}/favorite`)
+    return response.data
+  }
+
+  async updateContainerEnv(containerId: string, envVars: Record<string, string>): Promise<{ status: string; message: string }> {
+    const response = await this.client.put(`/containers/${containerId}/env`, envVars)
+    return response.data
+  }
+
+  async updateContainerPorts(containerId: string, ports: Record<string, number>): Promise<{ status: string; message: string }> {
+    const response = await this.client.put(`/containers/${containerId}/ports`, ports)
+    return response.data
+  }
+
+  async getAlertRules(containerId?: string): Promise<any[]> {
+    const params = containerId ? { container_id: containerId } : {}
+    const response = await this.client.get('/alert-rules', { params })
+    return response.data
+  }
+
+  async createAlertRule(data: { container_id?: string; name: string; cpu_threshold: number; memory_threshold: number; enabled: boolean }): Promise<any> {
+    const response = await this.client.post('/alert-rules', data)
+    return response.data
+  }
+
+  async updateAlertRule(ruleId: number, data: { name?: string; cpu_threshold?: number; memory_threshold?: number; enabled?: boolean }): Promise<any> {
+    const response = await this.client.put(`/alert-rules/${ruleId}`, data)
+    return response.data
+  }
+
+  async deleteAlertRule(ruleId: number): Promise<{ status: string; message: string }> {
+    const response = await this.client.delete(`/alert-rules/${ruleId}`)
+    return response.data
+  }
+
+  async getSchedules(containerId?: string): Promise<any[]> {
+    const params = containerId ? { container_id: containerId } : {}
+    const response = await this.client.get('/schedules', { params })
+    return response.data
+  }
+
+  async createSchedule(data: { container_id: string; action: string; time: string }): Promise<any> {
+    const response = await this.client.post('/schedules', data)
+    return response.data
+  }
+
+  async updateSchedule(scheduleId: number, data: { action?: string; time?: string; enabled?: boolean }): Promise<any> {
+    const response = await this.client.put(`/schedules/${scheduleId}`, data)
+    return response.data
+  }
+
+  async deleteSchedule(scheduleId: number): Promise<{ status: string; message: string }> {
+    const response = await this.client.delete(`/schedules/${scheduleId}`)
+    return response.data
+  }
+
+  async verify2FA(userId: number, code: string): Promise<{ access_token: string }> {
+    const response = await this.client.post('/auth/2fa/verify', null, { params: { user_id: userId, code } })
+    return response.data
+  }
+
+  async setup2FA(userId: number, code: string): Promise<{ secret: string; qr_code: string }> {
+    const response = await this.client.post('/auth/2fa/setup', null, { params: { user_id: userId, code } })
+    return response.data
+  }
+
+  async disable2FA(userId: number, code: string, password: string): Promise<{ status: string; message: string }> {
+    const response = await this.client.post('/auth/2fa/disable', null, { params: { user_id: userId, code, password } })
+    return response.data
+  }
+
+  async logoutAllDevices(newPassword: string): Promise<{ status: string; message: string }> {
+    const response = await this.client.post('/auth/logout-all', null, { params: { new_password: newPassword } })
+    return response.data
+  }
+
+  async getNetworks(): Promise<any[]> {
+    const response = await this.client.get('/docker/networks')
+    return response.data
+  }
+
+  async createNetwork(
+    name: string,
+    driver: string = 'bridge',
+    internal: boolean = false,
+    attachable: boolean = false,
+    labels?: Record<string, string>
+  ): Promise<any> {
+    const response = await this.client.post('/docker/networks', null, {
+      params: { name, driver, internal, attachable, labels }
+    })
+    return response.data
+  }
+
+  async deleteNetwork(networkId: string): Promise<{ status: string; message: string }> {
+    const response = await this.client.delete(`/docker/networks/${networkId}`)
     return response.data
   }
 }

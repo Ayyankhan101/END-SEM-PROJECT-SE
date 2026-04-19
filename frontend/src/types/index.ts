@@ -192,8 +192,21 @@ export interface HostCreate {
 export interface User {
   id: number;
   username: string;
+  role?: string;
   created_at?: string;
   updated_at?: string;
+  must_change_password?: boolean;
+}
+
+export interface UserCreate {
+  username: string;
+  password: string;
+  role?: string;
+}
+
+export interface UserUpdate {
+  password?: string;
+  role?: string;
   must_change_password?: boolean;
 }
 
@@ -206,6 +219,8 @@ export interface LoginRequest {
 export interface TokenResponse {
   access_token: string;
   token_type: string;
+  requires_2fa?: boolean;
+  user_id?: number;
 }
 
 // Settings types
@@ -216,6 +231,7 @@ export interface Settings {
   metrics_ttl_days: number;
   recovery_enabled: boolean;
   jwt_expiration_hours: number;
+  two_factor_enabled?: boolean;
 }
 
 export interface SettingsUpdate {
@@ -262,4 +278,90 @@ export interface ContainerCreateConfig {
   command?: string;
   memory_limit?: number;
   cpu_limit?: number;
+}
+
+// Audit log types
+export interface AuditLog {
+  id: number;
+  user_id: number | null;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  details: Record<string, unknown> | null;
+  ip_address: string | null;
+  timestamp: string;
+}
+
+export interface AuditStats {
+  period_days: number;
+  total_actions: number;
+  actions_by_type: Record<string, number>;
+  resources_by_type: Record<string, number>;
+  daily_activity: { date: string; count: number }[];
+}
+
+// Notification types
+export interface NotificationChannel {
+  id: number;
+  name: string;
+  channel_type: 'email' | 'webhook' | 'slack' | 'discord';
+  config: Record<string, unknown>;
+  is_enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface NotificationChannelCreate {
+  name: string;
+  channel_type: string;
+  config: Record<string, unknown>;
+  is_enabled?: boolean;
+}
+
+export interface NotificationLog {
+  id: number;
+  channel_id: number;
+  alert_id: number | null;
+  status: 'sent' | 'failed' | 'pending';
+  error_message: string | null;
+  timestamp: string;
+}
+
+// Backup types
+export interface BackupInfo {
+  filename: string;
+  size: number;
+  created: string;
+  path: string;
+}
+
+// Docker resource types
+export interface DockerImage {
+  id: string;
+  tags: string[];
+  size: number;
+  created: string;
+  labels: Record<string, string>;
+}
+
+export interface DockerVolume {
+  name: string;
+  driver: string;
+  mountpoint: string;
+  created: string;
+  labels: Record<string, string>;
+  size: number;
+}
+
+export interface DockerNetwork {
+  id: string;
+  name: string;
+  driver: string;
+  scope: string;
+  created: string;
+  labels: Record<string, string>;
+  internal: boolean;
+  attachable: boolean;
+  ingress: boolean;
+  containers: string[];
 }
