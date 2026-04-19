@@ -255,12 +255,12 @@ export default function DockerResources() {
                         <div className="text-gray-400 text-sm">
                           Size: {formatSize(img.size)} | Created: {new Date(img.created).toLocaleDateString()}
                         </div>
-                        {img.tags.length > 0 && (
+                        {(img.tags || []).length > 0 && (
                           <div className="flex gap-2 mt-2">
-                            {img.tags.slice(0, 5).map(tag => (
+                            {(img.tags || []).slice(0, 5).map(tag => (
                               <span key={tag} className="text-xs bg-gray-700 px-2 py-0.5 rounded">{tag}</span>
                             ))}
-                            {img.tags.length > 5 && (
+                            {(img.tags || []).length > 5 && (
                               <span className="text-xs text-gray-500">+{img.tags.length - 5} more</span>
                             )}
                           </div>

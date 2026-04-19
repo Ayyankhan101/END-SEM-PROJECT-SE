@@ -263,7 +263,7 @@ function ContainerDetail() {
                 Add Port
               </button>
             </div>
-            {(container as any)?.network_settings?.Ports ? (
+            {(container as any)?.network_settings?.Ports && Object.keys((container as any).network_settings.Ports).length > 0 ? (
               <table className="w-full">
                 <thead className="bg-gray-700">
                   <tr>
@@ -275,7 +275,7 @@ function ContainerDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries((container as any).network_settings.Ports).map(([port, binding]: [string, any]) => (
+                  {Object.entries((container as any)?.network_settings?.Ports || {}).map(([port, binding]: [string, any]) => (
                     <tr key={port} className="border-t border-gray-700">
                       <td className="px-4 py-2">{port}</td>
                       <td className="px-4 py-2">{binding?.[0]?.HostPort || '-'}</td>
@@ -337,7 +337,7 @@ function ContainerDetail() {
                   </tr>
                 </thead>
                 <tbody>
-                  {((container as any).config.Env as string[]).map((env: string, idx: number) => {
+                  {((container as any)?.config?.Env as string[] || []).map((env: string, idx: number) => {
                     const [key, ...valueParts] = env.split('=')
                     return (
                       <tr key={idx} className="border-t border-gray-700">

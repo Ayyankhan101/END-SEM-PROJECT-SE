@@ -93,7 +93,7 @@ function ContainerCompare() {
         <div className="mb-6">
           <h2 className="text-lg font-medium mb-3">Select Containers (max {maxContainers})</h2>
           <div className="flex flex-wrap gap-2">
-            {(containers as ContainerType[]).map((container: ContainerType) => {
+            {(containers as ContainerType[] || []).map((container: ContainerType) => {
               const isSelected = selectedIds.includes(container.id)
               return (
                 <button
