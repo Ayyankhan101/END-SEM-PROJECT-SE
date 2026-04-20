@@ -188,7 +188,7 @@ function App() {
   const login = (newToken: string, newUserId?: number) => {
     localStorage.setItem('token', newToken)
     setToken(newToken)
-    if (newUserId) {
+    if (newUserId !== undefined && newUserId !== null) {
       localStorage.setItem('userId', String(newUserId))
       setUserId(newUserId)
     }

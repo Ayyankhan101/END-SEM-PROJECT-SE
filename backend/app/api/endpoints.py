@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from pydantic import validator
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.db.models import get_db
 from app.db.models import Container, Metric, Alert, RecoveryAction, Stack, Host
@@ -79,7 +82,7 @@ async def verify_2fa(
         raise HTTPException(status_code=401, detail="Invalid 2FA code")
     
     token = create_access_token({"sub": user.username, "role": user.role})
-    return TokenResponse(access_token=token)
+    return TokenResponse(access_token=token, user_id=user.id)
 
 
 class TOTPSetupResponse(BaseModel):
@@ -265,6 +268,7 @@ async def get_container_metrics(
 
 @router.get("/metrics/history")
 async def get_metrics_history(
+    request: Request,
     container_id: str = None,
     hours: int = 24,
     db: Session = Depends(get_db),
@@ -294,6 +298,7 @@ async def get_metrics_history(
 
 @router.get("/alerts", response_model=List[AlertResponse])
 async def get_alerts(
+    request: Request,
     limit: int = 50,
     container_id: str = None,
     db: Session = Depends(get_db),
@@ -799,6 +804,7 @@ async def bulk_delete_containers(
                     db.commit()
                 results.append({"id": container_id, "success": success})
             except Exception as e:
+                logger.error(f"Failed to delete container {container_id}: {e}", exc_info=True)
                 results.append({"id": container_id, "success": False, "error": str(e)})
     
     return {"status": "success", "results": results}

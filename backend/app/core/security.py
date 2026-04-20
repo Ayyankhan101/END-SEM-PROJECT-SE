@@ -97,6 +97,6 @@ def create_initial_user():
         logger.warning("=" * 60)
         logger.warning("INITIAL USER CREATED")
         logger.warning("Username: admin")
-        logger.warning("Password: admin123")
-        logger.warning("Role: admin")
+        logger.warning("Password: (set in database - see .env or default admin123)")
+        logger.warning("IMPORTANT: Change password on first login (must_change_password=True)")
         logger.warning("=" * 60)

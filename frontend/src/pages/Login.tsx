@@ -17,13 +17,24 @@ function Login() {
     setError('')
     try {
       if (requires2FA) {
-        const data = await api.verify2FA(userId!, twoFactorCode)
-        authLogin(data.access_token, userId!)
+        const currentUserId = userId || parseInt(localStorage.getItem('pendingUserId') || '0', 10)
+        if (!currentUserId) {
+          setError('Session expired. Please login again.')
+          setRequires2FA(false)
+          return
+        }
+        const data = await api.verify2FA(currentUserId, twoFactorCode)
+        authLogin(data.access_token, currentUserId)
+        localStorage.removeItem('pendingUserId')
       } else {
         const data = await api.login({ username, password })
         if (data.requires_2fa) {
           setRequires2FA(true)
-          setUserId(data.user_id || null)
+          const newUserId = data.user_id || null
+          setUserId(newUserId)
+          if (newUserId) {
+            localStorage.setItem('pendingUserId', String(newUserId))
+          }
         } else {
           authLogin(data.access_token, data.user_id)
         }
