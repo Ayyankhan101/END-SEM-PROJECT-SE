@@ -59,7 +59,7 @@ async def login(
         return TokenResponse(access_token="", requires_2fa=True, user_id=user.id)
     
     token = create_access_token({"sub": user.username, "role": user.role})
-    return TokenResponse(access_token=token)
+    return TokenResponse(access_token=token, user_id=user.id)
 
 
 @router.post("/auth/2fa/verify")
