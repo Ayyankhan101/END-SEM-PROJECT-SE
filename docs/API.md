@@ -50,11 +50,109 @@ Login to get JWT token.
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIs...",
-  "token_type": "bearer"
+  "token_type": "bearer",
+  "requires_2fa": false,
+  "user_id": 1
 }
 ```
 
 **Rate Limit:** 10 requests/minute
+
+---
+
+### 2FA Setup
+
+**POST** `/auth/2fa/setup`
+
+Setup TOTP-based 2FA authentication.
+
+**Request Body:**
+```json
+{
+  "user_id": 1,
+  "code": "JBSWY3DPEHPK3PXP"
+}
+```
+
+**Response:**
+```json
+{
+  "secret": "JBSWY3DPEHPK3PXP",
+  "qr_code": "data:image/png;base64,..."
+}
+```
+
+---
+
+### 2FA Verify
+
+**POST** `/auth/2fa/verify`
+
+Verify 2FA code and get token.
+
+**Request Body:**
+```json
+{
+  "user_id": 1,
+  "code": "123456"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer"
+}
+```
+
+---
+
+### 2FA Disable
+
+**POST** `/auth/2fa/disable`
+
+Disable 2FA for a user.
+
+**Request Body:**
+```json
+{
+  "user_id": 1,
+  "code": "123456",
+  "password": "admin123"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "2FA disabled"
+}
+```
+
+---
+
+### Logout All Devices
+
+**POST** `/auth/logout-all`
+
+Invalidate all sessions by changing password.
+
+**Request Body:**
+```json
+{
+  "new_password": "new_secure_password"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "All sessions invalidated. Please login with new password."
+}
+```
 
 ---
 
@@ -226,6 +324,191 @@ Get metrics history across all containers or filtered.
 }
 ```
 
+**Rate Limit:** 30 requests/minute
+
+---
+
+**GET** `/containers?favorites=true`
+
+List favorite containers only.
+
+**Query Parameters:**
+- `favorites` (bool)
+
+---
+
+**POST** `/containers/bulk/start`
+
+Start multiple containers.
+
+**Request Body:**
+```json
+{
+  "container_ids": ["abc123", "def456"]
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "results": [
+    { "id": "abc123", "success": true },
+    { "id": "def456", "success": false }
+  ]
+}
+```
+
+---
+
+**POST** `/containers/bulk/stop`
+
+Stop multiple containers.
+
+**Request Body:**
+```json
+{
+  "container_ids": ["abc123", "def456"]
+}
+```
+
+---
+
+**POST** `/containers/bulk/restart`
+
+Restart multiple containers.
+
+**Request Body:**
+```json
+{
+  "container_ids": ["abc123", "def456"]
+}
+```
+
+---
+
+**POST** `/containers/bulk/delete`
+
+Delete multiple containers (admin only).
+
+**Request Body:**
+```json
+{
+  "container_ids": ["abc123", "def456"]
+}
+```
+
+---
+
+**POST** `/containers/{container_id}/stop`
+
+Stop a container.
+
+**Rate Limit:** 30 requests/minute
+
+---
+
+**PUT** `/containers/{container_id}`
+
+Update container metadata.
+
+**Request Body:**
+```json
+{
+  "group": "production",
+  "is_favorite": true
+}
+```
+
+**Response:**
+```json
+{
+  "id": "abc...",
+  "name": "nginx",
+  "group": "production",
+  "is_favorite": true
+}
+```
+
+---
+
+**PUT** `/containers/{container_id}/env`
+
+Update environment variables.
+
+**Request Body:**
+```json
+{
+  "NODE_ENV": "production",
+  "DEBUG": "false"
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Environment updated"
+}
+```
+
+---
+
+**PUT** `/containers/{container_id}/ports`
+
+Update port mappings.
+
+**Request Body:**
+```json
+{
+  "80": 8080
+}
+```
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Ports updated"
+}
+```
+
+---
+
+**GET** `/containers/group/{group}`
+
+List containers by group.
+
+**Response:**
+```json
+[
+  { "id": "abc...", "name": "web", "group": "production" }
+]
+```
+
+---
+
+**POST** `/containers/{container_id}/exec`
+
+Execute command in container.
+
+**Request Body:**
+```json
+{
+  "cmd": ["ls", "-la"],
+  "tty": true,
+  "stdin": false
+}
+```
+
+**Response:**
+```json
+{
+  "exec_id": "exec_session_abc",
+  "container_id": "abc..."
+}
+```
+
 ---
 
 ### Alerts
@@ -360,6 +643,14 @@ Test host connection.
 
 ---
 
+**POST** `/hosts/{host_id}/activate`
+
+Activate a Docker host (switch current connection).
+
+**Rate Limit:** 10 requests/minute
+
+---
+
 **DELETE** `/hosts/{host_id}`
 
 Remove a host.
@@ -400,6 +691,287 @@ Update settings.
 ```
 
 **Rate Limit:** 10 requests/minute
+
+---
+
+### Users
+
+**GET** `/users`
+
+List all users (admin only).
+
+**Response:**
+```json
+[
+  { "id": 1, "username": "admin", "role": "admin", "created_at": "2024-01-01T00:00:00", "must_change_password": false }
+]
+```
+
+---
+
+**POST** `/users`
+
+Create new user (admin only).
+
+**Request Body:**
+```json
+{
+  "username": "newuser",
+  "password": "password123",
+  "role": "user"
+}
+```
+
+---
+
+**PUT** `/users/{user_id}`
+
+Update user (admin only).
+
+**Request Body:**
+```json
+{
+  "password": "newpassword",
+  "role": "admin",
+  "force_password_change": true
+}
+```
+
+---
+
+**DELETE** `/users/{user_id}`
+
+Delete user (admin only).
+
+---
+
+### Alert Rules
+
+**GET** `/alert-rules`
+
+List alert rules.
+
+**Query Parameters:**
+- `container_id` (string, optional)
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "container_id": "abc...",
+    "name": "High CPU Alert",
+    "cpu_threshold": 80,
+    "memory_threshold": 80,
+    "enabled": true
+  }
+]
+```
+
+---
+
+**POST** `/alert-rules`
+
+Create alert rule.
+
+**Request Body:**
+```json
+{
+  "name": "High CPU Alert",
+  "cpu_threshold": 80,
+  "memory_threshold": 80,
+  "container_id": "abc...",
+  "enabled": true
+}
+```
+
+---
+
+**PUT** `/alert-rules/{rule_id}`
+
+Update alert rule.
+
+---
+
+**DELETE** `/alert-rules/{rule_id}`
+
+Delete alert rule.
+
+---
+
+### Schedules
+
+**GET** `/schedules`
+
+List scheduled actions.
+
+**Query Parameters:**
+- `container_id` (string, optional)
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "container_id": "abc...",
+    "container_name": "nginx",
+    "action": "restart",
+    "time": "03:00",
+    "enabled": true
+  }
+]
+```
+
+---
+
+**POST** `/schedules`
+
+Create scheduled action.
+
+**Request Body:**
+```json
+{
+  "container_id": "abc...",
+  "action": "restart",
+  "time": "03:00"
+}
+```
+
+---
+
+**PUT** `/schedules/{schedule_id}`
+
+Update scheduled action.
+
+**Request Body:**
+```json
+{
+  "action": "stop",
+  "time": "04:00",
+  "enabled": false
+}
+```
+
+---
+
+**DELETE** `/schedules/{schedule_id}`
+
+Delete scheduled action.
+
+---
+
+### Backup
+
+**GET** `/backup/list`
+
+List available backups.
+
+**Response:**
+```json
+{
+  "backups": [
+    {
+      "filename": "dockwatch_backup_20240101.tar.gz",
+      "size": 1234567,
+      "created": "2024-01-01T00:00:00"
+    }
+  ]
+}
+```
+
+---
+
+**POST** `/backup/create`
+
+Create new backup.
+
+**Query Parameters:**
+- `include_metrics` (bool, default: true)
+
+**Response:**
+```json
+{
+  "status": "pending",
+  "message": "Backup creation started",
+  "filename": "dockwatch_backup_20240101.tar.gz"
+}
+```
+
+---
+
+**POST** `/backup/restore`
+
+Restore from backup.
+
+**Request Body:** multipart file upload (.tar.gz)
+
+**Response:**
+```json
+{
+  "status": "success",
+  "message": "Backup restored successfully",
+  "restored": {
+    "containers": 5,
+    "stacks": 2,
+    "hosts": 1
+  }
+}
+```
+
+---
+
+### Audit
+
+**GET** `/audit/logs`
+
+Get audit logs.
+
+**Query Parameters:**
+- `skip` (int, default: 0)
+- `limit` (int, default: 50)
+- `action` (string, optional)
+- `resource_type` (string, optional)
+- `user_id` (int, optional)
+- `days` (int, default: 7)
+
+**Response:**
+```json
+{
+  "logs": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "action": "container_restart",
+      "resource_type": "container",
+      "resource_id": "abc...",
+      "ip_address": "192.168.1.1",
+      "timestamp": "2024-01-01T00:00:00"
+    }
+  ],
+  "total": 100,
+  "skip": 0,
+  "limit": 50
+}
+```
+
+---
+
+**GET** `/audit/stats`
+
+Get audit statistics.
+
+**Response:**
+```json
+{
+  "period_days": 7,
+  "total_actions": 50,
+  "actions_by_type": { "container_restart": 10 },
+  "resources_by_type": { "container": 30 },
+  "daily_activity": [
+    { "date": "2024-01-01", "count": 5 }
+  ]
+}
+```
 
 ---
 

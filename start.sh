@@ -20,6 +20,10 @@ if [ -z "$DOCKWATCH_JWT_SECRET" ] || [ ${#DOCKWATCH_JWT_SECRET} -lt 32 ]; then
     echo "✅ Generated JWT secret (32+ chars)"
 fi
 
+echo "🧹 Cleaning up stale networks..."
+docker network prune -f 2>/dev/null || true
+docker network rm end-sem-project-se_default 2>/dev/null || true
+
 echo "🐳 Building and starting containers..."
 docker compose build --parallel
 docker compose up -d

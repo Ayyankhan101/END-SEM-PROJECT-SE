@@ -2,10 +2,19 @@
 
 ## Prerequisites
 
+### Backend
 - Docker Engine 20.10+
 - Docker Compose 2.0+
 - 2GB RAM minimum
 - 10GB disk space
+
+### Frontend (Development)
+- Node.js 18+
+- npm 9+
+
+Run locally: `npm install && npm run dev`
+
+Or use Docker: Already included in docker-compose.yml
 
 ## Production Deployment
 
@@ -31,11 +40,31 @@ openssl rand -base64 32
 
 ### 2. Build and Start
 
+#### Backend Only
 ```bash
 docker-compose up -d --build
 ```
 
+#### Frontend (Development)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+#### Frontend (Production Build)
+
+```bash
+cd frontend
+npm install
+npm run build
+npm run preview
+```
+
 ### 3. Verify Deployment
+
+### 4. Verify Deployment
 
 Check service status:
 ```bash
@@ -48,11 +77,16 @@ docker-compose logs -f backend
 docker-compose logs -f frontend
 ```
 
-### 4. Access the Application
+### 5. Access the Application
 
-- Frontend: http://localhost:3000
+**Development:**
+- Frontend: http://localhost:5173 (Vite dev server)
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
+
+**Production (Docker):**
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
 
 ### 5. Default Credentials
 
@@ -123,6 +157,20 @@ docker-compose up -d
 Check logs:
 ```bash
 docker-compose logs backend
+```
+
+### Network overlap error
+
+If you see `Pool overlaps with other network` error:
+
+```bash
+docker network prune
+```
+
+Or remove conflicting network manually:
+```bash
+docker network ls
+docker network rm <network-name>
 ```
 
 ### Database issues
