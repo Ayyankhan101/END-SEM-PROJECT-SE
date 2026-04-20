@@ -3,6 +3,7 @@ Audit logging API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
 from datetime import datetime, timedelta
 import json
@@ -83,7 +84,7 @@ async def get_audit_stats(
     # Get action counts
     action_counts = db.query(
         AuditLog.action,
-        db.func.count(AuditLog.id).label('count')
+        func.count(AuditLog.id).label('count')
     ).filter(
         AuditLog.timestamp >= cutoff_date
     ).group_by(AuditLog.action).all()
@@ -91,18 +92,18 @@ async def get_audit_stats(
     # Get resource type counts
     resource_counts = db.query(
         AuditLog.resource_type,
-        db.func.count(AuditLog.id).label('count')
+        func.count(AuditLog.id).label('count')
     ).filter(
         AuditLog.timestamp >= cutoff_date
     ).group_by(AuditLog.resource_type).all()
     
     # Get daily activity
     daily_activity = db.query(
-        db.func.date(AuditLog.timestamp).label('date'),
-        db.func.count(AuditLog.id).label('count')
+        func.date(AuditLog.timestamp).label('date'),
+        func.count(AuditLog.id).label('count')
     ).filter(
         AuditLog.timestamp >= cutoff_date
-    ).group_by(db.func.date(AuditLog.timestamp)).order_by('date').all()
+    ).group_by(func.date(AuditLog.timestamp)).order_by('date').all()
     
     return {
         "period_days": days,
