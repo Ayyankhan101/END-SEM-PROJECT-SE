@@ -69,3 +69,7 @@ htmlcov/
 # OS
 .DS_Store
 Thumbs.db
+
+# Internal tooling
+.kilo/
+.commandcode/
