@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import api from '@/services/api'
 import type { BackupInfo } from '@/types'
+import { formatSize } from '../utils/format'
 
 export default function Backup() {
   const [backups, setBackups] = useState<BackupInfo[]>([])
@@ -51,13 +52,6 @@ export default function Backup() {
     } finally {
       setRestoring(false)
     }
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
   }
 
   return (

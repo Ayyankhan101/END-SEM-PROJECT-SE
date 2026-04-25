@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
-from pydantic import validator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,6 +23,18 @@ from app.models.schemas import (
     HostResponse,
     SettingsUpdate,
     SettingsResponse,
+    TOTPSetupResponse,
+    UserCreate,
+    UserUpdate,
+    UserResponse,
+    ContainerUpdate,
+    AlertRuleCreate,
+    AlertRuleUpdate,
+    AlertRuleResponse,
+    ScheduleCreate,
+    ScheduleUpdate,
+    ScheduleResponse,
+    ExecCreate,
 )
 from app.core.security import create_access_token, verify_password, get_current_user, get_password_hash, get_user_role
 from app.core.config import get_config
@@ -83,11 +94,6 @@ async def verify_2fa(
     
     token = create_access_token({"sub": user.username, "role": user.role})
     return TokenResponse(access_token=token, user_id=user.id)
-
-
-class TOTPSetupResponse(BaseModel):
-    secret: str
-    qr_code: str
 
 
 @router.post("/auth/2fa/setup", response_model=TOTPSetupResponse)
@@ -810,32 +816,6 @@ async def bulk_delete_containers(
     return {"status": "success", "results": results}
 
 
-class UserCreate(BaseModel):
-    username: str
-    password: str
-    role: str = "user"
-
-
-class UserUpdate(BaseModel):
-    password: Optional[str] = None
-    role: Optional[str] = None
-    must_change_password: Optional[bool] = None
-    force_password_change: Optional[bool] = None
-
-
-class UserResponse(BaseModel):
-    id: int
-    username: str
-    role: str
-    created_at: Optional[datetime] = None
-    must_change_password: bool = False
-
-
-class ContainerUpdate(BaseModel):
-    group: Optional[str] = None
-    is_favorite: Optional[bool] = None
-
-
 @router.put("/containers/{container_id}/env")
 async def update_container_env(
     request: Request,
@@ -1047,31 +1027,6 @@ async def delete_user(
     return {"status": "success", "message": f"User {user.username} deleted"}
 
 
-class AlertRuleCreate(BaseModel):
-    container_id: Optional[str] = None
-    name: str
-    cpu_threshold: float = 80.0
-    memory_threshold: float = 80.0
-    enabled: bool = True
-
-
-class AlertRuleUpdate(BaseModel):
-    name: Optional[str] = None
-    cpu_threshold: Optional[float] = None
-    memory_threshold: Optional[float] = None
-    enabled: Optional[bool] = None
-
-
-class AlertRuleResponse(BaseModel):
-    id: int
-    container_id: Optional[str]
-    name: str
-    cpu_threshold: float
-    memory_threshold: float
-    enabled: bool
-    created_at: Optional[datetime] = None
-
-
 @router.get("/alert-rules", response_model=List[AlertRuleResponse])
 async def list_alert_rules(
     container_id: Optional[str] = None,
@@ -1210,58 +1165,6 @@ async def delete_alert_rule(
     return {"status": "success", "message": f"Alert rule {rule.name} deleted"}
 
 
-class ScheduleCreate(BaseModel):
-    container_id: str
-    action: str
-    time: str  # HH:MM format
-
-    @validator('time')
-    def validate_time_format(cls, v):
-        import re
-        if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', v):
-            raise ValueError('Time must be in HH:MM format (00:00-23:59)')
-        return v
-
-    @validator('action')
-    def validate_action(cls, v):
-        if v not in ['start', 'stop', 'restart']:
-            raise ValueError('Action must be start, stop, or restart')
-        return v
-
-
-class ScheduleUpdate(BaseModel):
-    action: Optional[str] = None
-    time: Optional[str] = None
-    enabled: Optional[bool] = None
-
-    @validator('time')
-    def validate_time_format(cls, v):
-        if v is None:
-            return v
-        import re
-        if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', v):
-            raise ValueError('Time must be in HH:MM format (00:00-23:59)')
-        return v
-
-    @validator('action')
-    def validate_action(cls, v):
-        if v is None:
-            return v
-        if v not in ['start', 'stop', 'restart']:
-            raise ValueError('Action must be start, stop, or restart')
-        return v
-
-
-class ScheduleResponse(BaseModel):
-    id: int
-    container_id: str
-    container_name: Optional[str] = None
-    action: str
-    time: str
-    enabled: bool
-    created_at: Optional[datetime] = None
-
-
 @router.get("/schedules", response_model=List[ScheduleResponse])
 async def list_schedules(
     container_id: Optional[str] = None,
@@ -1382,12 +1285,6 @@ async def delete_schedule(
     db.commit()
     
     return {"status": "success", "message": "Schedule deleted"}
-
-
-class ExecCreate(BaseModel):
-    cmd: List[str]
-    tty: bool = True
-    stdin: bool = False
 
 
 @router.post("/containers/{container_id}/exec")

@@ -173,4 +173,118 @@ class SettingsResponse(BaseModel):
     jwt_expiration_hours: int
 
 
+class TOTPSetupResponse(BaseModel):
+    secret: str
+    qr_code: str
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    role: str = "user"
+
+
+class UserUpdate(BaseModel):
+    password: Optional[str] = None
+    role: Optional[str] = None
+    must_change_password: Optional[bool] = None
+    force_password_change: Optional[bool] = None
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+    created_at: Optional[datetime] = None
+    must_change_password: bool = False
+
+
+class ContainerUpdate(BaseModel):
+    group: Optional[str] = None
+    is_favorite: Optional[bool] = None
+
+
+class AlertRuleCreate(BaseModel):
+    container_id: Optional[str] = None
+    name: str
+    cpu_threshold: float = 80.0
+    memory_threshold: float = 80.0
+    enabled: bool = True
+
+
+class AlertRuleUpdate(BaseModel):
+    name: Optional[str] = None
+    cpu_threshold: Optional[float] = None
+    memory_threshold: Optional[float] = None
+    enabled: Optional[bool] = None
+
+
+class AlertRuleResponse(BaseModel):
+    id: int
+    container_id: Optional[str]
+    name: str
+    cpu_threshold: float
+    memory_threshold: float
+    enabled: bool
+    created_at: Optional[datetime] = None
+
+
+class ScheduleCreate(BaseModel):
+    container_id: str
+    action: str
+    time: str
+
+    @validator('time')
+    def validate_time_format(cls, v):
+        import re
+        if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', v):
+            raise ValueError('Time must be in HH:MM format (00:00-23:59)')
+        return v
+
+    @validator('action')
+    def validate_action(cls, v):
+        if v not in ['start', 'stop', 'restart']:
+            raise ValueError('Action must be start, stop, or restart')
+        return v
+
+
+class ScheduleUpdate(BaseModel):
+    action: Optional[str] = None
+    time: Optional[str] = None
+    enabled: Optional[bool] = None
+
+    @validator('time')
+    def validate_time_format(cls, v):
+        if v is None:
+            return v
+        import re
+        if not re.match(r'^([01]?[0-9]|2[0-3]):[0-5][0-9]$', v):
+            raise ValueError('Time must be in HH:MM format (00:00-23:59)')
+        return v
+
+    @validator('action')
+    def validate_action(cls, v):
+        if v is None:
+            return v
+        if v not in ['start', 'stop', 'restart']:
+            raise ValueError('Action must be start, stop, or restart')
+        return v
+
+
+class ScheduleResponse(BaseModel):
+    id: int
+    container_id: str
+    container_name: Optional[str] = None
+    action: str
+    time: str
+    enabled: bool
+    created_at: Optional[datetime] = None
+
+
+class ExecCreate(BaseModel):
+    cmd: List[str]
+    tty: bool = True
+    stdin: bool = False
+
+
 ContainerDetail.model_rebuild()

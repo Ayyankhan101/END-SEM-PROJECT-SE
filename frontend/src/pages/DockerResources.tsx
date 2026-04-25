@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Layers, X } from 'lucide-react'
 import api from '@/services/api'
 import type { DockerImage, DockerVolume, DockerNetwork } from '@/types'
+import { formatSize } from '../utils/format'
 
 type Tab = 'images' | 'volumes' | 'networks'
 
@@ -143,13 +144,6 @@ export default function DockerResources() {
       else newSet.add(id)
       return newSet
     })
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return bytes + ' B'
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
-    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
-    return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB'
   }
 
   const tabs: Tab[] = ['images', 'volumes', 'networks']
