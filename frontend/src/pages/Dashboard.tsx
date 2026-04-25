@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
@@ -77,19 +77,21 @@ function Dashboard() {
     return () => clearInterval(interval)
   }, [fetchContainers])
 
-  const filteredContainers = Array.isArray(containers) 
-    ? containers.filter((c: ContainerType) => {
-        const matchesSearch = 
-          c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          c.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          c.image?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          c.status?.toLowerCase().includes(searchTerm.toLowerCase())
-        const matchesStatus = statusFilter === 'all' || c.status === statusFilter
-        const matchesGroup = groupFilter === 'all' || (c as any).group === groupFilter
-        const matchesFavorites = !favoritesOnly || (c as any).is_favorite === 1
-        return matchesSearch && matchesStatus && matchesGroup && matchesFavorites
-      }) 
-    : []
+  const filteredContainers = useMemo(() => 
+    Array.isArray(containers) 
+      ? containers.filter((c: ContainerType) => {
+          const matchesSearch = 
+            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.image?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.status?.toLowerCase().includes(searchTerm.toLowerCase())
+          const matchesStatus = statusFilter === 'all' || c.status === statusFilter
+          const matchesGroup = groupFilter === 'all' || (c as any).group === groupFilter
+          const matchesFavorites = !favoritesOnly || (c as any).is_favorite === 1
+          return matchesSearch && matchesStatus && matchesGroup && matchesFavorites
+        }) 
+      : []
+  , [containers, searchTerm, statusFilter, groupFilter, favoritesOnly])
 
 const avgCpuRaw = (
     (Array.isArray(containers) ? containers : [])
@@ -377,7 +379,7 @@ const avgCpuRaw = (
         {loading ? (
           <div className="text-center py-12 text-gray-400">Loading containers...</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 container-scroll">
             {filteredContainers.map(container => (
               <ContainerCard 
                 key={container.id} 

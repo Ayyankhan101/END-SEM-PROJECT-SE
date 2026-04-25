@@ -250,7 +250,7 @@ html {
   color: var(--text-primary);
 }
 
-/* Noise texture overlay */
+/* Noisy texture removed for performance - re-enable if needed
 body::before {
   content: '';
   position: fixed;
@@ -260,6 +260,7 @@ body::before {
   pointer-events: none;
   z-index: 9999;
 }
+*/
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
@@ -519,4 +520,15 @@ input:focus, textarea:focus, select:focus {
     min-height: 44px;
     min-width: 44px;
   }
+}
+
+/* Performance optimizations */
+.container-scroll {
+  content-visibility: auto;
+  contain-intrinsic-size: 1000px;
+}
+
+.list-item {
+  content-visibility: auto;
+  contain-intrinsic-size: 80px;
 }
