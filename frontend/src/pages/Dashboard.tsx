@@ -91,11 +91,12 @@ function Dashboard() {
       }) 
     : []
 
-const avgCpu = (
+const avgCpuRaw = (
     (Array.isArray(containers) ? containers : [])
       .reduce((acc, c) => acc + (c.cpu_percent || 0), 0) / 
     ((Array.isArray(containers) ? containers : []).length || 1)
-  ).toFixed(1)
+  )
+  const avgCpu = Number(avgCpuRaw.toFixed(1))
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {

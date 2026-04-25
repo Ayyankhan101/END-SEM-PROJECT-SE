@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+trap 'set +a 2>/dev/null || true' EXIT
 
 echo "🔄 Restarting DockWatch..."
 
