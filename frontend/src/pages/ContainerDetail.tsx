@@ -150,7 +150,7 @@ function ContainerDetail() {
               <Cpu className="w-8 h-8 text-blue-500" />
               <div>
                 <p className="text-2xl font-bold">
-                  {currentMetrics.length > 0 ? Math.round(currentMetrics[currentMetrics.length-1]?.cpu_percent || 0) : 0}%
+                  {currentMetrics.length > 0 ? (currentMetrics[currentMetrics.length-1]?.cpu_percent || 0).toFixed(1) : 0}%
                 </p>
                 <p className="text-gray-400 text-sm">CPU Usage</p>
               </div>
@@ -161,7 +161,7 @@ function ContainerDetail() {
               <HardDrive className="w-8 h-8 text-green-500" />
               <div>
                 <p className="text-2xl font-bold">
-                  {currentMetrics.length > 0 ? Math.round(currentMetrics[currentMetrics.length-1]?.memory_percent || 0) : 0}%
+                  {currentMetrics.length > 0 ? (currentMetrics[currentMetrics.length-1]?.memory_percent || 0).toFixed(1) : 0}%
                 </p>
                 <p className="text-gray-400 text-sm">Memory Usage</p>
               </div>
