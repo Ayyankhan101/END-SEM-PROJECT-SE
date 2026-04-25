@@ -17,7 +17,7 @@ export default function ToastContainer({ toasts, onRemove }: ToastProps) {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2">
+    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2" role="region" aria-live="polite" aria-label="Notifications">
       {toasts.map(toast => (
         <div
           key={toast.id}
@@ -27,6 +27,7 @@ export default function ToastContainer({ toasts, onRemove }: ToastProps) {
           <button
             onClick={() => onRemove(toast.id)}
             className="text-gray-400 hover:text-white"
+            aria-label="Dismiss notification"
           >
             <X className="w-4 h-4" />
           </button>

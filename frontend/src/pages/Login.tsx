@@ -68,37 +68,46 @@ function Login() {
           {!requires2FA ? (
             <>
               <div className="mb-4">
-                <label className="block text-gray-400 text-sm mb-2">Username</label>
+                <label htmlFor="username" className="block text-gray-400 text-sm mb-2">Username</label>
                 <input
+                  id="username"
                   type="text"
+                  name="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full bg-gray-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-700 text-white px-4 py-2 rounded focus:ring-2 focus:ring-blue-500"
                   required
+                  autoComplete="username"
                 />
               </div>
               
               <div className="mb-6">
-                <label className="block text-gray-400 text-sm mb-2">Password</label>
+                <label htmlFor="password" className="block text-gray-400 text-sm mb-2">Password</label>
                 <input
+                  id="password"
                   type="password"
+                  name="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-gray-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-gray-700 text-white px-4 py-2 rounded focus:ring-2 focus:ring-blue-500"
                   required
+                  autoComplete="current-password"
                 />
               </div>
             </>
           ) : (
             <>
               <div className="mb-4">
-                <label className="block text-gray-400 text-sm mb-2">Authentication Code</label>
+                <label htmlFor="twoFactorCode" className="block text-gray-400 text-sm mb-2">Authentication Code</label>
                 <input
+                  id="twoFactorCode"
                   type="text"
+                  inputMode="numeric"
+                  name="one-time-code"
                   value={twoFactorCode}
                   onChange={(e) => setTwoFactorCode(e.target.value)}
-                  placeholder="Enter 6-digit code"
-                  className="w-full bg-gray-700 text-white px-4 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter 6-digit code…"
+                  className="w-full bg-gray-700 text-white px-4 py-2 rounded focus:ring-2 focus:ring-blue-500"
                   required
                   maxLength={6}
                   autoComplete="one-time-code"
@@ -110,6 +119,7 @@ function Login() {
                 type="button"
                 onClick={handleResend}
                 className="text-blue-400 text-sm hover:text-blue-300 mb-4"
+                aria-label="Back to login"
               >
                 ← Back to login
               </button>

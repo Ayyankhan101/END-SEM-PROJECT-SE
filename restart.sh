@@ -3,64 +3,46 @@ set -e
 
 echo "🔄 Restarting DockWatch..."
 
-# Check if Docker is running
-if ! docker info > /dev/null 2>&1; then
-    echo "❌ Docker is not running. Please start Docker first."
-    exit 1
-fi
+# Check Docker
+docker info > /dev/null 2>&1 || { echo "❌ Docker not running"; exit 1; }
 
-# Check if JWT_SECRET is set
+# Generate JWT if needed
 if [ -z "$DOCKWATCH_JWT_SECRET" ]; then
-    echo "⚠️  DOCKWATCH_JWT_SECRET not set. Generating one..."
+    echo "⚠️  DOCKWATCH_JWT_SECRET not set. Generating..."
     export DOCKWATCH_JWT_SECRET=$(openssl rand -hex 32)
-    echo "✅ Generated JWT_SECRET"
 fi
 
-# Check .env file
+# Create .env if missing
 if [ ! -f ".env" ]; then
-    echo "⚠️  .env file not found. Creating from template..."
+    echo "⚠️  .env not found. Creating..."
     cat > .env << EOF
-# DockWatch Environment Variables
-# Auto-generated on $(date)
-
-# REQUIRED: JWT Secret for authentication (generate with: openssl rand -hex 32)
 DOCKWATCH_JWT_SECRET=${DOCKWATCH_JWT_SECRET}
-
-# Optional: CORS origins (comma-separated)
 CORS_ORIGINS=http://localhost:3001,http://localhost:5173
-
-# Optional: Docker socket path
 DOCKWATCH_DOCKER_SOCKET=/var/run/docker.sock
 EOF
-    echo "✅ Created .env file"
 fi
 
-# Load .env if exists
-if [ -f ".env" ]; then
-    set -a
-    source .env
-    set +a
-fi
+# Load .env
+set -a
+source .env 2>/dev/null || true
+set +a
 
-# Build and start containers
-docker compose down --remove-orphans
-docker compose build --no-cache
-docker compose up -d
+# Smart rebuild: up with --build uses cache by default
+echo "📦 Building and starting services..."
+docker compose up -d --build
 
-echo "⏳ Waiting for services to be ready..."
-sleep 10
+# Quick health check (max 15s)
+echo "⏳ Checking health..."
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+    if curl -s --max-time 1 http://localhost:8001/api/health > /dev/null 2>&1; then
+        echo "✅ Backend ready"
+        break
+    fi
+    sleep 1
+done
 
-# Check health
-if curl -s http://localhost:8001/api/health > /dev/null 2>&1; then
-    echo "✅ Backend is healthy"
-else
-    echo "⚠️  Backend health check failed. Check logs with: docker compose logs backend"
-fi
-
-echo "✅ DockWatch restarted"
+echo "✅ DockWatch ready"
 echo ""
-echo "📍 Services:"
-echo "   Frontend: http://localhost:3001"
-echo "   Backend:  http://localhost:8001"
-echo ""
-echo "📝 To view logs: docker compose logs -f"
+echo "📍 Frontend: http://localhost:3001"
+echo "📍 Backend:  http://localhost:8001"
+echo "📝 Logs: docker compose logs -f"
