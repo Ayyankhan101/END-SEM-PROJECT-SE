@@ -32,7 +32,7 @@ server:
 
 security:
   # jwt_secret: (set via DOCKWATCH_JWT_SECRET environment variable)
-  jwt_algorithm: "HS256"
+  jwt_algorithm: "RS256"
   jwt_expiration_hours: 24
 
 logging:

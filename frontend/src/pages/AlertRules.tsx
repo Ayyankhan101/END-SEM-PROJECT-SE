@@ -4,20 +4,21 @@ import { useAuth } from '@/App'
 import { api } from '@/services/api'
 import { 
   Container, 
-  Plus, 
   Layers, 
-  Server,
-  Bell,
-  Save,
-  Box,
-  FileText,
-  Settings,
-  Users as UsersIcon,
+  Server, 
+  Bell, 
+  Settings, 
+  FileText, 
+  Users, 
+  AlertCircle, 
+  Brain, 
+  ArrowLeft, 
+  RefreshCw,
+  Plus,
   Pencil,
-  Trash2,
-  ArrowLeft,
-  AlertTriangle
+  Trash2
 } from 'lucide-react'
+import Header from '@/components/Header'
 
 interface AlertRule {
   id: number
@@ -36,13 +37,14 @@ function AlertRules() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingRule, setEditingRule] = useState<AlertRule | null>(null)
-  const [formData, setFormData] = useState({ 
+const [formData, setFormData] = useState({ 
     name: '', 
     container_id: '', 
     cpu_threshold: 80, 
-    memory_threshold: 80,
+    memory_threshold: 80, 
     enabled: true 
   })
+  const [isLoading, setIsLoading] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -65,6 +67,7 @@ function AlertRules() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsLoading(true)
     try {
       const data = {
         name: formData.name,
@@ -85,6 +88,8 @@ function AlertRules() {
       fetchData()
     } catch (err) {
       console.error('Failed to save rule:', err)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -118,58 +123,13 @@ function AlertRules() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="p-2 hover:bg-gray-700 rounded">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <AlertTriangle className="w-8 h-8 text-yellow-500" />
-            <h1 className="text-xl font-bold">Alert Rules</h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <Link to="/stacks" className="p-2 hover:bg-gray-700 rounded">
-              <Layers className="w-5 h-5" />
-            </Link>
-            <Link to="/hosts" className="p-2 hover:bg-gray-700 rounded">
-              <Server className="w-5 h-5" />
-            </Link>
-            <Link to="/alerts" className="p-2 hover:bg-gray-700 rounded">
-              <Bell className="w-5 h-5 text-yellow-500" />
-            </Link>
-            <Link to="/audit" className="p-2 hover:bg-gray-700 rounded" title="Audit Logs">
-              <FileText className="w-5 h-5" />
-            </Link>
-            <Link to="/notifications" className="p-2 hover:bg-gray-700 rounded" title="Notifications">
-              <Bell className="w-5 h-5" />
-            </Link>
-            <Link to="/backup" className="p-2 hover:bg-gray-700 rounded" title="Backup">
-              <Save className="w-5 h-5" />
-            </Link>
-            <Link to="/docker" className="p-2 hover:bg-gray-700 rounded" title="Docker Resources">
-              <Box className="w-5 h-5" />
-            </Link>
-            <Link to="/settings" className="p-2 hover:bg-gray-700 rounded">
-              Settings
-            </Link>
-            <Link to="/users" className="p-2 hover:bg-gray-700 rounded" title="User Management">
-              <UsersIcon className="w-5 h-5" />
-            </Link>
-            <span className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
-              isConnected 
-                ? 'bg-green-900/50 text-green-400' 
-                : 'bg-red-900/50 text-red-400'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></span>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
-            <button onClick={logout} className="text-gray-400 hover:text-white">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header 
+        title="Alert Rules" 
+        icon={<AlertCircle size={24} />} 
+        onRefresh={fetchData}
+        isConnected={isConnected}
+        onLogout={logout}
+      />
 
       <div className="p-6">
         <div className="flex justify-between items-center mb-6">

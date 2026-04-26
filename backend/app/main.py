@@ -14,6 +14,7 @@ from app.api import (
     backup,
     docker_resources,
     health,
+    ai,
 )
 from app.db.models import init_db
 from app.services.docker_monitor import get_docker_monitor
@@ -71,6 +72,8 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Add exception handlers
+setup_exception_handlers(app)
 cors_config = get_cors_config()
 
 app.add_middleware(
@@ -78,13 +81,28 @@ app.add_middleware(
     **cors_config,
 )
 
-app.include_router(endpoints.router, prefix="/api")
-app.include_router(websocket.router)
-app.include_router(audit.router, prefix="/api")
-app.include_router(notifications.router, prefix="/api")
-app.include_router(backup.router, prefix="/api")
-app.include_router(docker_resources.router, prefix="/api")
-app.include_router(health.router, prefix="/api")
+# Security headers middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # CSP - allow same origin and websockets
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:"
+
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+app.include_router(endpoints, prefix="/api")
+app.include_router(websocket)
+app.include_router(audit, prefix="/api")
+app.include_router(notifications, prefix="/api")
+app.include_router(backup, prefix="/api")
+app.include_router(docker_resources, prefix="/api")
+app.include_router(health, prefix="/api")
+app.include_router(ai, prefix="/api")
 
 
 @app.get("/")

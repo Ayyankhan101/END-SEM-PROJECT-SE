@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from app.db.database import get_session
+from app.db import get_session
 from app.db.models import Alert, Container, AlertRule
 from app.core.config import get_config
 

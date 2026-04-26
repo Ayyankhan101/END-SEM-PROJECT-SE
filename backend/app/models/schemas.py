@@ -187,8 +187,6 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     password: Optional[str] = None
     role: Optional[str] = None
-    must_change_password: Optional[bool] = None
-    force_password_change: Optional[bool] = None
 
 
 class UserResponse(BaseModel):
@@ -196,7 +194,6 @@ class UserResponse(BaseModel):
     username: str
     role: str
     created_at: Optional[datetime] = None
-    must_change_password: bool = False
 
 
 class ContainerUpdate(BaseModel):

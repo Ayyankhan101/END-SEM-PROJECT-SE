@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy import delete
-from app.db.database import get_session
+from app.db import get_session
 from app.db.models import Metric
 from app.core.config import get_config
 

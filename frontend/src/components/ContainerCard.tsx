@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Play, Pause, RotateCw, Square, CheckSquare, Square as SquareIcon, Star } from 'lucide-react'
+import { Play, Pause, RotateCw, Square, CheckSquare, Square as SquareIcon, Star, Trash2 } from 'lucide-react'
 import { api } from '@/services/api'
 import type { Container } from '@/types'
 import { MouseEvent, useState } from 'react'
@@ -55,7 +55,15 @@ function ContainerCard({ container, selected = false, onSelect }: ContainerCardP
   const handleStart = (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault()
     e.stopPropagation()
-    handleAction('start', () => api.restartContainer(container.id))
+    handleAction('start', () => api.startContainer(container.id))
+  }
+
+  const handleDelete = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (confirm(`Delete container "${container.name}"?`)) {
+      handleAction('delete', () => api.deleteContainer(container.id))
+    }
   }
 
   const handleStop = (e: MouseEvent<HTMLButtonElement>) => {
@@ -158,6 +166,14 @@ function ContainerCard({ container, selected = false, onSelect }: ContainerCardP
             title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
           >
             <Star className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={loadingAction === 'delete'}
+            className="p-1.5 bg-red-800 hover:bg-red-700 rounded text-gray-300 disabled:opacity-50"
+            title="Delete"
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>

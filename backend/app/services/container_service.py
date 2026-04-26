@@ -293,9 +293,15 @@ class ContainerService:
 
             if config.get("memory_limit"):
                 host_config["mem_limit"] = config.get("memory_limit")
+            else:
+                host_config["mem_limit"] = "512m"  # Default limit
+
             if config.get("cpu_limit"):
                 host_config["cpu_period"] = 100000
                 host_config["cpu_quota"] = int(config.get("cpu_limit") * 100000)
+            else:
+                host_config["cpu_period"] = 100000
+                host_config["cpu_quota"] = 50000  # Default 0.5 CPU
 
             container = self.docker_client.containers.run(
                 image=config["image"],

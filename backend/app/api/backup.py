@@ -1,5 +1,5 @@
 """
-Backup and restore API endpoints
+Backup and restore API endpoints with encryption
 """
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, File, UploadFile, Request
@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.db.models import get_db, User, Container, Metric, Alert, Stack, Host, Settings
-from app.core.security import get_current_user
+from app.core.security import get_current_user, encrypt_secret, decrypt_secret, _fernet
 from app.core.config import get_config
 from app.core.rate_limiter import limiter
 
@@ -66,7 +66,7 @@ async def create_backup(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Create a new backup"""
+    """Create a new encrypted backup"""
     ensure_backup_dir()
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -78,13 +78,13 @@ async def create_backup(
 
     return {
         "status": "pending",
-        "message": "Backup creation started",
+        "message": "Backup creation started (encrypted)",
         "filename": filename,
     }
 
 
 def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session):
-    """Create backup archive"""
+    """Create encrypted backup archive"""
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -96,7 +96,8 @@ def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session)
                 "hosts": [],
                 "settings": {},
                 "backup_metadata": {
-                    "version": "1.0",
+                    "version": "1.1",
+                    "encrypted": True,
                     "created": datetime.now().isoformat(),
                     "include_metrics": include_metrics,
                 },
@@ -111,9 +112,7 @@ def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session)
                     "image": c.image,
                     "status": c.status,
                     "created_at": c.created_at.isoformat() if c.created_at else None,
-                    "last_updated": c.last_updated.isoformat()
-                    if c.last_updated
-                    else None,
+                    "last_updated": c.last_updated.isoformat() if c.last_updated else None,
                 }
 
                 if include_metrics:
@@ -123,9 +122,7 @@ def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session)
                             "cpu_percent": m.cpu_percent,
                             "memory_percent": m.memory_percent,
                             "memory_usage": m.memory_usage,
-                            "timestamp": m.timestamp.isoformat()
-                            if m.timestamp
-                            else None,
+                            "timestamp": m.timestamp.isoformat() if m.timestamp else None,
                         }
                         for m in metrics
                     ]
@@ -135,56 +132,49 @@ def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session)
             # Export stacks
             stacks = db.query(Stack).all()
             for s in stacks:
-                data["stacks"].append(
-                    {
-                        "id": s.id,
-                        "name": s.name,
-                        "compose_file": s.compose_file,
-                        "status": s.status,
-                        "created_at": s.created_at.isoformat()
-                        if s.created_at
-                        else None,
-                        "updated_at": s.updated_at.isoformat()
-                        if s.updated_at
-                        else None,
-                    }
-                )
+                data["stacks"].append({
+                    "id": s.id,
+                    "name": s.name,
+                    "compose_file": s.compose_file,
+                    "status": s.status,
+                    "user_id": s.user_id,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                })
 
             # Export hosts
             hosts = db.query(Host).all()
             for h in hosts:
-                data["hosts"].append(
-                    {
-                        "id": h.id,
-                        "name": h.name,
-                        "socket_path": h.socket_path,
-                        "api_version": h.api_version,
-                        "status": h.status,
-                        "last_seen": h.last_seen.isoformat() if h.last_seen else None,
-                    }
-                )
+                data["hosts"].append({
+                    "id": h.id,
+                    "name": h.name,
+                    "socket_path": h.socket_path,
+                    "api_version": h.api_version,
+                    "status": h.status,
+                })
+
+            # Export settings
+            settings = db.query(Settings).all()
+            for s in settings:
+                data["settings"][s.key] = s.value
 
             # Write data to temp file
             data_file = temp_path / "data.json"
-            import json
-
             with open(data_file, "w") as f:
                 json.dump(data, f, indent=2)
 
-            # Create tar.gz archive
-            with tarfile.open(backup_path, "w:gz") as tar:
+            # Create internal tarball
+            inner_tar = temp_path / "backup.tar.gz"
+            with tarfile.open(inner_tar, "w:gz") as tar:
                 tar.add(data_file, arcname="data.json")
 
-                # Also backup config file if it exists
-                config = get_config()
-                config_path = (
-                    Path(config.database.path).parent.parent / "config" / "config.yaml"
-                )
-                if config_path.exists():
-                    tar.add(config_path, arcname="config.yaml")
+            # Encrypt the tarball
+            with open(inner_tar, "rb") as f:
+                encrypted_data = _fernet.encrypt(f.read())
+            
+            with open(backup_path, "wb") as f:
+                f.write(encrypted_data)
 
     except Exception as e:
-        # Clean up on failure
         if backup_path.exists():
             backup_path.unlink()
         raise e
@@ -198,40 +188,45 @@ async def restore_backup(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Restore from backup"""
-    if not file.filename.endswith(".tar.gz"):
-        raise HTTPException(
-            status_code=400, detail="Invalid file format. Expected .tar.gz"
-        )
-
+    """Restore from encrypted backup"""
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Save uploaded file
-            backup_path = temp_path / "backup.tar.gz"
-            with open(backup_path, "wb") as f:
-                content = await file.read()
-                f.write(content)
+            # Read and decrypt uploaded file
+            content = await file.read()
+            try:
+                decrypted_data = _fernet.decrypt(content)
+            except Exception:
+                raise HTTPException(status_code=400, detail="Invalid or unencrypted backup file")
+
+            backup_tar = temp_path / "backup.tar.gz"
+            with open(backup_tar, "wb") as f:
+                f.write(decrypted_data)
 
             # Extract archive
-            with tarfile.open(backup_path, "r:gz") as tar:
+            with tarfile.open(backup_tar, "r:gz") as tar:
                 tar.extractall(temp_path)
 
             # Load data
             data_file = temp_path / "data.json"
             with open(data_file, "r") as f:
-                import json
-
                 data = json.load(f)
+
+            # Version compatibility check
+            metadata = data.get("backup_metadata", {})
+            version = metadata.get("version", "1.0")
+            CURRENT_VERSION = "1.1"
+            
+            if version > CURRENT_VERSION:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Backup version {version} is newer than system version {CURRENT_VERSION}. Restore aborted."
+                )
 
             # Restore containers
             for container_data in data.get("containers", []):
-                existing = (
-                    db.query(Container)
-                    .filter(Container.id == container_data["id"])
-                    .first()
-                )
+                existing = db.query(Container).filter(Container.id == container_data["id"]).first()
                 if not existing:
                     container = Container(
                         id=container_data["id"],
@@ -243,30 +238,24 @@ async def restore_backup(
 
             # Restore stacks
             for stack_data in data.get("stacks", []):
-                existing = db.query(Stack).filter(Stack.id == stack_data["id"]).first()
+                existing = db.query(Stack).filter(Stack.name == stack_data["name"]).first()
                 if not existing:
                     stack = Stack(
-                        id=stack_data["id"],
                         name=stack_data["name"],
                         compose_file=stack_data["compose_file"],
                         status=stack_data.get("status", "stopped"),
+                        user_id=stack_data.get("user_id"),
                     )
                     db.add(stack)
 
-            # Restore hosts
-            for host_data in data.get("hosts", []):
-                existing = db.query(Host).filter(Host.id == host_data["id"]).first()
-                if not existing:
-                    host = Host(
-                        id=host_data["id"],
-                        name=host_data["name"],
-                        socket_path=host_data.get(
-                            "socket_path", "unix:///var/run/docker.sock"
-                        ),
-                        api_version=host_data.get("api_version", "1.41"),
-                        status=host_data.get("status", "disconnected"),
-                    )
-                    db.add(host)
+            # Restore settings
+            for key, value in data.get("settings", {}).items():
+                existing = db.query(Settings).filter(Settings.key == key).first()
+                if existing:
+                    existing.value = value
+                else:
+                    setting = Settings(key=key, value=value)
+                    db.add(setting)
 
             db.commit()
 
@@ -276,10 +265,12 @@ async def restore_backup(
                 "restored": {
                     "containers": len(data.get("containers", [])),
                     "stacks": len(data.get("stacks", [])),
-                    "hosts": len(data.get("hosts", [])),
+                    "settings": len(data.get("settings", {})),
                 },
             }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to restore backup: {str(e)}"

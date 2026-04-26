@@ -1,6 +1,13 @@
 """Test fixtures for DockWatch tests"""
+import os
 import pytest
 from fastapi.testclient import TestClient
+
+# Set test environment variables BEFORE any app imports
+os.environ["DOCKWATCH_JWT_SECRET"] = "test-secret-1234567890abcdefghijklmnopqrstuvwxyz"
+os.environ["DOCKWATCH_CONFIG"] = os.path.join(os.path.dirname(__file__), "test_config.yaml")
+os.environ["DOCKWATCH_DB_PATH"] = os.path.join(os.path.dirname(__file__), "test.db")
+
 from app.main import app
 
 

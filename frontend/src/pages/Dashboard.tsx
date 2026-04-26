@@ -24,9 +24,11 @@ import {
   CheckSquare,
   Square as SquareIcon,
   Users as UsersIcon,
-  AlertCircle
+  AlertCircle,
+  Brain
 } from 'lucide-react'
 import ContainerCard from '@/components/ContainerCard'
+import Header from '@/components/Header'
 import type { Container as ContainerType } from '@/types'
 
 interface Stats {
@@ -70,6 +72,11 @@ function Dashboard() {
       setLoading(false)
     }
   }, [setContainers])
+
+  const handleRefresh = useCallback(async () => {
+    await api.syncContainers()
+    await fetchContainers()
+  }, [fetchContainers])
 
   useEffect(() => {
     fetchContainers()
@@ -175,65 +182,13 @@ const avgCpuRaw = (
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4 sticky top-0 z-50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Container className="w-8 h-8 text-blue-500" />
-            <h1 className="text-xl font-bold">DockWatch</h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <Link to="/containers/new" className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm">
-              <Plus className="w-4 h-4" />
-              Create Container
-            </Link>
-            <Link to="/stacks" className="p-2 hover:bg-gray-700 rounded">
-              <Layers className="w-5 h-5" />
-            </Link>
-            <Link to="/hosts" className="p-2 hover:bg-gray-700 rounded">
-              <Server className="w-5 h-5" />
-            </Link>
-            <button onClick={fetchContainers} className="p-2 hover:bg-gray-700 rounded">
-              <RefreshCw className="w-5 h-5" />
-            </button>
-            <Link to="/alerts" className="p-2 hover:bg-gray-700 rounded">
-              <AlertTriangle className="w-5 h-5 text-yellow-500" />
-            </Link>
-            <Link to="/audit" className="p-2 hover:bg-gray-700 rounded" title="Audit Logs">
-              <FileText className="w-5 h-5" />
-            </Link>
-            <Link to="/notifications" className="p-2 hover:bg-gray-700 rounded" title="Notifications">
-              <Bell className="w-5 h-5" />
-            </Link>
-            <Link to="/backup" className="p-2 hover:bg-gray-700 rounded" title="Backup">
-              <Save className="w-5 h-5" />
-            </Link>
-            <Link to="/docker" className="p-2 hover:bg-gray-700 rounded" title="Docker Resources">
-              <Box className="w-5 h-5" />
-            </Link>
-            <Link to="/settings" className="p-2 hover:bg-gray-700 rounded">
-              Settings
-            </Link>
-            <Link to="/users" className="p-2 hover:bg-gray-700 rounded" title="User Management">
-              <UsersIcon className="w-5 h-5" />
-            </Link>
-            <Link to="/alert-rules" className="p-2 hover:bg-gray-700 rounded" title="Alert Rules">
-              <AlertCircle className="w-5 h-5" />
-            </Link>
-            <span className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium ${
-              isConnected 
-                ? 'bg-green-900/50 text-green-400' 
-                : 'bg-red-900/50 text-red-400'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></span>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </span>
-            <button onClick={logout} className="text-gray-400 hover:text-white">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+      <Header 
+        title="Dashboard" 
+        icon={<Container size={24} />} 
+        onRefresh={handleRefresh}
+        isConnected={isConnected}
+        onLogout={logout}
+      />
 
       <div className="p-6">
         <div className="grid grid-cols-4 gap-4 mb-6">

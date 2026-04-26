@@ -44,6 +44,9 @@ class DockerClientService:
         # docker lib 7.x requires unix:// prefix for socket
         if socket.startswith("/") and not socket.startswith("unix://"):
             socket = f"unix:///{socket.lstrip('/')}"
+        # Ensure HTTP URLs have proper prefix
+        elif socket.startswith("http://") or socket.startswith("https://"):
+            pass  # Already has HTTP prefix, use as-is
 
         try:
             self._client = docker.DockerClient(base_url=socket, version=version)

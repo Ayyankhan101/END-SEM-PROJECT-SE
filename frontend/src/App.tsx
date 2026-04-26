@@ -17,9 +17,10 @@ import TerminalPage from './pages/Terminal'
 import AlertRules from './pages/AlertRules'
 import ContainerCompare from './pages/ContainerCompare'
 import Schedules from './pages/Schedules'
+import AIInsights from './pages/AIInsights'
 import ErrorBoundary from './components/ErrorBoundary'
 
-type Theme = 'dark' | 'light'
+type Theme = 'light' | 'dark' | 'system'
 
 interface AuthContextType {
   token: string | null;
@@ -32,7 +33,9 @@ interface AuthContextType {
   setAlerts: React.Dispatch<React.SetStateAction<any[]>>;
   isConnected: boolean;
   theme: Theme;
+  resolvedTheme: 'light' | 'dark';
   setTheme: (theme: Theme) => void;
+  toggleTheme: () => void;
   userId: number | null;
 }
 
@@ -47,7 +50,9 @@ const defaultContext: AuthContextType = {
   setAlerts: () => {},
   isConnected: false,
   theme: 'dark',
+  resolvedTheme: 'dark',
   setTheme: () => {},
+  toggleTheme: () => {},
   userId: null
 };
 
@@ -56,7 +61,6 @@ const AuthContext = createContext<AuthContextType>(defaultContext)
 export const useAuth = () => useContext(AuthContext)
 
 const HEARTBEAT_INTERVAL = 30000
-const RECONNECT_DELAY = 5000
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'))
@@ -68,19 +72,71 @@ function App() {
   const [containers, setContainers] = useState<any[]>([])
   const [alerts, setAlerts] = useState<any[]>([])
   const [isConnected, setIsConnected] = useState(false)
+  const [connectionChecked, setConnectionChecked] = useState(false)
+
+  // Check API connectivity (fallback when WS fails)
+  useEffect(() => {
+    if (token && !connectionChecked) {
+      fetch('/api/health', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => {
+          setIsConnected(res.ok)
+          setConnectionChecked(true)
+        })
+        .catch(() => {
+          setIsConnected(false)
+        })
+    }
+  }, [token])
+
+  // Periodic connectivity check
+  useEffect(() => {
+    if (token && connectionChecked) {
+      const interval = setInterval(() => {
+        fetch('/api/health', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+          .then(res => setIsConnected(res.ok))
+          .catch(() => setIsConnected(false))
+      }, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [token, connectionChecked])
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('theme')
-    return (saved === 'light' || saved === 'dark') ? saved : 'dark'
+    return (saved === 'light' || saved === 'dark' || saved === 'system') ? saved : 'dark'
   })
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark')
 
   useEffect(() => {
     localStorage.setItem('theme', theme)
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark')
+    
+    const applyTheme = (isDark: boolean) => {
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
+      if (isDark) {
+        document.documentElement.classList.add('dark')
+        document.documentElement.classList.remove('light')
+      } else {
+        document.documentElement.classList.add('light')
+        document.documentElement.classList.remove('dark')
+      }
+      setResolvedTheme(isDark ? 'dark' : 'light')
+    }
+
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      applyTheme(mediaQuery.matches)
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches)
+      mediaQuery.addEventListener('change', handler)
     } else {
-      document.documentElement.classList.remove('dark')
+      applyTheme(theme === 'dark')
     }
   }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+  }, [])
 
   const socketRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -88,12 +144,15 @@ function App() {
   const reconnectAttemptRef = useRef(0)
   const maxReconnectDelay = 30000
   const baseReconnectDelay = 1000
+  const MAX_WS_RETRIES = 3
+
+  const [wsFailed, setWsFailed] = useState(false)
 
   const connectSocket = useCallback(() => {
     if (!token) return
 
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/metrics`
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/metrics?token=${token}`
 
     console.log('Connecting to WebSocket:', wsUrl)
     const ws = new WebSocket(wsUrl)
@@ -130,6 +189,11 @@ function App() {
             }
             return [...prev, data.container]
           })
+        } else if (data.type === 'container_deleted') {
+          setContainers(prev => {
+            if (!Array.isArray(prev)) return []
+            return prev.filter(c => c.id !== data.container_id)
+          })
         } else if (data.type === 'alert') {
           setAlerts(prev => {
             const currentAlerts = Array.isArray(prev) ? prev : []
@@ -145,10 +209,17 @@ function App() {
 
     ws.onclose = () => {
       console.log('WebSocket disconnected')
-      setIsConnected(false)
       setSocket(null)
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current)
+      }
+      
+      // Check if max retries exceeded - fallback to polling
+      if (reconnectAttemptRef.current >= MAX_WS_RETRIES - 1) {
+        console.log(`WebSocket failed after ${MAX_WS_RETRIES} attempts, using polling fallback`)
+        setWsFailed(true)
+        setIsConnected(false)  // Use polling instead
+        return
       }
       
       // Exponential backoff reconnect
@@ -208,11 +279,12 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <AuthContext.Provider value={{ token, userId, login, logout, socket, containers, setContainers, alerts, setAlerts, isConnected, theme, setTheme }}>
+      <AuthContext.Provider value={{ token, userId, login, logout, socket, containers, setContainers, alerts, setAlerts, isConnected, theme, resolvedTheme, setTheme, toggleTheme }}>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={!token ? <Login /> : <Navigate to="/" />} />
             <Route path="/" element={token ? <Dashboard /> : <Navigate to="/login" />} />
+            <Route path="/containers" element={token ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/container/:id" element={token ? <ContainerDetail /> : <Navigate to="/login" />} />
             <Route path="/containers/new" element={token ? <ContainerCreate /> : <Navigate to="/login" />} />
             <Route path="/stacks" element={token ? <Stacks /> : <Navigate to="/login" />} />
@@ -228,6 +300,7 @@ function App() {
             <Route path="/alert-rules" element={token ? <AlertRules /> : <Navigate to="/login" />} />
             <Route path="/compare" element={token ? <ContainerCompare /> : <Navigate to="/login" />} />
             <Route path="/schedules" element={token ? <Schedules /> : <Navigate to="/login" />} />
+            <Route path="/ai" element={token ? <AIInsights /> : <Navigate to="/login" />} />
           </Routes>
         </BrowserRouter>
       </AuthContext.Provider>

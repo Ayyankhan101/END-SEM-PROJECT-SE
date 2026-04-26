@@ -1,7 +1,7 @@
 """
 Notification channels and logs API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import json
@@ -11,6 +11,7 @@ from datetime import datetime
 from app.db.models import get_db, NotificationChannel, NotificationLog, Alert, User
 from app.core.security import get_current_user
 from app.core.validation import validate_string, validate_json, ValidationError
+from app.core.rate_limiter import limiter
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -23,7 +24,9 @@ class NotificationChannelCreate:
 
 
 @router.get("/channels")
+@limiter.limit("60/minute")
 async def get_notification_channels(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -44,7 +47,9 @@ async def get_notification_channels(
 
 
 @router.post("/channels")
+@limiter.limit("20/minute")
 async def create_notification_channel(
+    request: Request,
     name: str,
     channel_type: str,
     config: dict,
@@ -80,7 +85,7 @@ async def create_notification_channel(
         return {
             "id": channel.id,
             "name": channel.name,
-            "channel_type": channel.channel_type,
+            "channel_type": channel_type,
             "config": json.loads(channel.config),
             "is_enabled": bool(channel.is_enabled)
         }
@@ -92,7 +97,9 @@ async def create_notification_channel(
 
 
 @router.delete("/channels/{channel_id}")
+@limiter.limit("20/minute")
 async def delete_notification_channel(
+    request: Request,
     channel_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -108,7 +115,9 @@ async def delete_notification_channel(
 
 
 @router.post("/channels/{channel_id}/test")
+@limiter.limit("10/minute")
 async def test_notification_channel(
+    request: Request,
     channel_id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),

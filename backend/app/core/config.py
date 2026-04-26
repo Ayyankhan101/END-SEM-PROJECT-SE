@@ -4,7 +4,11 @@ import yaml
 import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from dotenv import load_dotenv
+
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"))
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +34,10 @@ def get_default_jwt_secret():
             "Set ENV=development for development mode."
         )
     
-    # Development fallback with warning
-    logger.warning("⚠️  USING DEV SECRET - DO NOT USE IN PRODUCTION")
-    logger.warning("⚠️  Set DOCKWATCH_JWT_SECRET for production deployments")
-    return "dev-secret-only-do-not-use-in-production"
+    # No fallback - secret must be set
+    raise ValueError(
+        "DOCKWATCH_JWT_SECRET must be set. Set it in .env or environment variables."
+    )
 
 
 def validate_environment() -> None:
@@ -51,6 +55,13 @@ class DockerConfig(BaseModel):
     api_version: str = "1.41"
     poll_interval: int = 5
     max_containers: int = 50
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Override socket_path from environment variable
+        env_socket = os.environ.get("DOCKWATCH_DOCKER_SOCKET")
+        if env_socket:
+            self.socket_path = env_socket
 
 
 class MonitoringConfig(BaseModel):
@@ -105,6 +116,13 @@ class CORSConfig(BaseModel):
     allow_credentials: bool = True
 
 
+class AIConfig(BaseModel):
+    provider: str = "ollama"  # "ollama", "openai", "anthropic", "together"
+    api_key: str = ""
+    endpoint: str = "http://localhost:11434"
+    model: str = "llama3"
+
+
 class Config(BaseModel):
     docker: DockerConfig = DockerConfig()
     monitoring: MonitoringConfig = MonitoringConfig()
@@ -114,6 +132,7 @@ class Config(BaseModel):
     security: SecurityConfig = SecurityConfig()
     logging: LoggingConfig = LoggingConfig()
     cors: Optional[CORSConfig] = None
+    ai: Optional[AIConfig] = None
 
 
 _config: Optional[Config] = None

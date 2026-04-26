@@ -1,0 +1,226 @@
+/* ============================
+   LAYER 1: Primitive Tokens
+   ============================ */
+:root {
+  /* Colors - Brand */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+
+  /* Colors - Gray */
+  --color-gray-50: #fafafa;
+  --color-gray-100: #f5f5f5;
+  --color-gray-200: #e5e5e5;
+  --color-gray-300: #d4d4d4;
+  --color-gray-400: #a3a3a3;
+  --color-gray-500: #737373;
+  --color-gray-600: #525252;
+  --color-gray-700: #404040;
+  --color-gray-800: #262626;
+  --color-gray-900: #171717;
+  --color-gray-950: #0a0a0a;
+
+  /* Colors - Semantic */
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-green-400: #4ade80;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+  --color-yellow-400: #facc15;
+  --color-yellow-500: #eab308;
+  --color-orange-400: #fb923c;
+  --color-orange-500: #f97316;
+
+  /* Spacing */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Typography */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 1.875rem;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Border Radius */
+  --radius-none: 0;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+
+  /* Transitions */
+  --transition-fast: 150ms;
+  --transition-base: 200ms;
+  --transition-slow: 300ms;
+}
+
+/* ============================
+   LAYER 2: Semantic Tokens (Light)
+   ============================ */
+:root, .light {
+  /* Text */
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-600);
+  --text-tertiary: var(--color-gray-500);
+  --text-inverse: var(--color-gray-50);
+  --text-link: var(--color-blue-600);
+  --text-link-hover: var(--color-blue-700);
+
+  /* Surface */
+  --surface-base: var(--color-gray-50);
+  --surface-raised: white;
+  --surface-overlay: white;
+  --surface-inverse: var(--color-gray-900);
+
+  /* Border */
+  --border-default: var(--color-gray-200);
+  --border-subtle: var(--color-gray-100);
+  --border-strong: var(--color-gray-300);
+
+  /* Interactive */
+  --interactive-primary: var(--color-blue-600);
+  --interactive-primary-hover: var(--color-blue-700);
+  --interactive-secondary: var(--color-gray-100);
+  --interactive-secondary-hover: var(--color-gray-200);
+
+  /* Feedback */
+  --feedback-success: var(--color-green-600);
+  --feedback-warning: var(--color-yellow-600);
+  --feedback-error: var(--color-red-600);
+  --feedback-info: var(--color-blue-600);
+
+  /* State */
+  --state-focus: var(--color-blue-500);
+  --state-disabled: var(--color-gray-300);
+}
+
+/* ============================
+   LAYER 2: Semantic Tokens (Dark)
+   ============================ */
+.dark {
+  /* Text */
+  --text-primary: var(--color-gray-50);
+  --text-secondary: var(--color-gray-400);
+  --text-tertiary: var(--color-gray-500);
+  --text-inverse: var(--color-gray-900);
+  --text-link: var(--color-blue-400);
+  --text-link-hover: var(--color-blue-300);
+
+  /* Surface */
+  --surface-base: var(--color-gray-900);
+  --surface-raised: var(--color-gray-800);
+  --surface-overlay: var(--color-gray-800);
+  --surface-inverse: var(--color-gray-50);
+
+  /* Border */
+  --border-default: var(--color-gray-700);
+  --border-subtle: var(--color-gray-800);
+  --border-strong: var(--color-gray-600);
+
+  /* Interactive */
+  --interactive-primary: var(--color-blue-500);
+  --interactive-primary-hover: var(--color-blue-400);
+  --interactive-secondary: var(--color-gray-700);
+  --interactive-secondary-hover: var(--color-gray-600);
+
+  /* Feedback */
+  --feedback-success: var(--color-green-400);
+  --feedback-warning: var(--color-yellow-400);
+  --feedback-error: var(--color-red-400);
+  --feedback-info: var(--color-blue-400);
+
+  /* State */
+  --state-focus: var(--color-blue-400);
+  --state-disabled: var(--color-gray-600);
+}
+
+/* ============================
+   LAYER 3: Component Tokens
+   ============================ */
+:root {
+  /* Button */
+  --button-bg: var(--interactive-primary);
+  --button-bg-hover: var(--interactive-primary-hover);
+  --button-text: white;
+  --button-radius: var(--radius-md);
+  --button-padding-x: var(--space-4);
+  --button-padding-y: var(--space-2);
+  --button-font-size: var(--font-size-sm);
+  --button-font-weight: var(--font-weight-medium);
+
+  /* Input */
+  --input-bg: var(--surface-raised);
+  --input-bg-disabled: var(--interactive-secondary);
+  --input-text: var(--text-primary);
+  --input-placeholder: var(--text-tertiary);
+  --input-border: var(--border-default);
+  --input-border-focus: var(--state-focus);
+  --input-radius: var(--radius-md);
+
+  /* Card */
+  --card-bg: var(--surface-raised);
+  --card-border: var(--border-default);
+  --card-radius: var(--radius-lg);
+  --card-shadow: var(--shadow-md);
+
+  /* Header */
+  --header-bg: var(--surface-raised);
+  --header-border: var(--border-subtle);
+
+  /* Modal */
+  --modal-bg: var(--surface-overlay);
+  --modal-border: var(--border-default);
+  --modal-radius: var(--radius-xl);
+  --modal-shadow: var(--shadow-xl);
+
+  /* Badge */
+  --badge-bg-success: var(--color-green-500);
+  --badge-bg-warning: var(--color-yellow-500);
+  --badge-bg-error: var(--color-red-500);
+  --badge-bg-info: var(--color-blue-500);
+  --badge-text: white;
+}
+
+/* ============================
+   Aliases for backwards compatibility
+   ============================ */
+.bg-gray-900 { background-color: var(--color-gray-900); }
+.bg-gray-800 { background-color: var(--color-gray-800); }
+.bg-gray-700 { background-color: var(--color-gray-700); }
+.text-white { color: white; }
+.text-gray-300 { color: var(--text-secondary); }
+.text-gray-400 { color: var(--text-tertiary); }
+.border-gray-700 { border-color: var(--color-gray-700); }
+.border-gray-700 { border-color: var(--border-default); }

@@ -37,8 +37,9 @@ function TerminalPage() {
     xtermRef.current = term
     fitAddonRef.current = fitAddon
 
+    const token = localStorage.getItem('token')
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/exec/${id}`
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/exec/${id}?token=${token}`
     
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws

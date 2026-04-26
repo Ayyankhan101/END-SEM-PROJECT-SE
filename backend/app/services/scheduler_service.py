@@ -4,7 +4,7 @@ Background scheduler service for scheduled container actions.
 import logging
 import asyncio
 from datetime import datetime
-from app.db.database import get_session
+from app.db import get_session
 from app.db.models import Schedule
 from app.services.docker_monitor import get_docker_monitor
 

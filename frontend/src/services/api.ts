@@ -73,9 +73,34 @@ class ApiClient {
         // Handle 401 Unauthorized
         if (error.response?.status === 401 && !originalRequest._retry) {
           originalRequest._retry = true
+          
+          const refreshToken = localStorage.getItem('refresh_token')
+          if (refreshToken) {
+            try {
+              if (!this.refreshPromise) {
+                this.refreshPromise = this.client.post('/auth/refresh', null, {
+                  params: { refresh_token: refreshToken },
+                  _retry: true // Don't retry the refresh request itself
+                } as any).then(res => (res.data as any).access_token)
+              }
+              
+              const newToken = await this.refreshPromise
+              this.refreshPromise = null
+              
+              localStorage.setItem('token', newToken)
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${newToken}`
+              }
+              return this.client(originalRequest)
+            } catch (refreshError) {
+              this.refreshPromise = null
+              console.error('Refresh token failed', refreshError)
+            }
+          }
 
-          // Clear token and redirect to login
+          // Clear token and redirect to login if refresh fails
           localStorage.removeItem('token')
+          localStorage.removeItem('refresh_token')
           window.location.href = '/login'
           return Promise.reject(error)
         }
@@ -153,28 +178,43 @@ class ApiClient {
     return response.data
   }
 
+  async syncContainers(): Promise<{ status: string; message: string }> {
+    const response = await this.client.post('/containers/sync')
+    return response.data
+  }
+
+  async startContainer(id: string): Promise<{ status: string; message: string }> {
+    const response = await this.client.post(`/containers/${id}/start`)
+    return response.data
+  }
+
+  async deleteContainer(id: string): Promise<{ status: string; message: string }> {
+    const response = await this.client.delete(`/containers/${id}`)
+    return response.data
+  }
+
   async createContainer(config: ContainerCreateConfig): Promise<{ status: string; container: Container }> {
     const response = await this.client.post('/containers', config)
     return response.data
   }
 
   async bulkStartContainers(containerIds: string[]): Promise<{ status: string; results: { id: string; success: boolean }[] }> {
-    const response = await this.client.post('/containers/bulk/start', containerIds)
+    const response = await this.client.post('/containers/bulk/start', { container_ids: containerIds })
     return response.data
   }
 
   async bulkStopContainers(containerIds: string[]): Promise<{ status: string; results: { id: string; success: boolean }[] }> {
-    const response = await this.client.post('/containers/bulk/stop', containerIds)
+    const response = await this.client.post('/containers/bulk/stop', { container_ids: containerIds })
     return response.data
   }
 
   async bulkRestartContainers(containerIds: string[]): Promise<{ status: string; results: { id: string; success: boolean }[] }> {
-    const response = await this.client.post('/containers/bulk/restart', containerIds)
+    const response = await this.client.post('/containers/bulk/restart', { container_ids: containerIds })
     return response.data
   }
 
   async bulkDeleteContainers(containerIds: string[]): Promise<{ status: string; results: { id: string; success: boolean; error?: string }[] }> {
-    const response = await this.client.post('/containers/bulk/delete', containerIds)
+    const response = await this.client.post('/containers/bulk/delete', { container_ids: containerIds })
     return response.data
   }
 
@@ -400,8 +440,8 @@ class ApiClient {
     return response.data
   }
 
-  async toggleContainerFavorite(containerId: string): Promise<{ status: string; is_favorite: boolean }> {
-    const response = await this.client.put(`/containers/${containerId}/favorite`)
+  async toggleContainerFavorite(containerId: string): Promise<{ status: string; is_favorite: number; message: string }> {
+    const response = await this.client.post(`/containers/${containerId}/favorite`)
     return response.data
   }
 
@@ -467,8 +507,18 @@ class ApiClient {
     return response.data
   }
 
-  async disable2FA(userId: number, code: string, password: string): Promise<{ status: string; message: string }> {
+    async disable2FA(userId: number, code: string, password: string): Promise<{ status: string; message: string }> {
     const response = await this.client.post('/auth/2fa/disable', null, { params: { user_id: userId, code, password } })
+    return response.data
+  }
+
+    // Password change endpoints
+    async changePasswordFirstLogin(username: string, oldPassword: string, newPassword: string): Promise<{ status: string; message: string }> {
+    const response = await this.client.post('/auth/change-password-first-login', {
+      username,
+      old_password: oldPassword,
+      new_password: newPassword
+    })
     return response.data
   }
 
@@ -497,6 +547,32 @@ class ApiClient {
 
   async deleteNetwork(networkId: string): Promise<{ status: string; message: string }> {
     const response = await this.client.delete(`/docker/networks/${networkId}`)
+    return response.data
+  }
+
+  // AI endpoints
+  async getAIHealth(): Promise<{ ollama: { available: boolean; model: string; endpoint: string } }> {
+    const response = await this.client.get('/ai/health')
+    return response.data
+  }
+
+  async getAIAnomalies(): Promise<{ anomalies: any[] }> {
+    const response = await this.client.get('/ai/anomalies')
+    return response.data
+  }
+
+  async getAIInsights(): Promise<any> {
+    const response = await this.client.get('/ai/insights')
+    return response.data
+  }
+
+  async analyzeContainer(containerId: string): Promise<any> {
+    const response = await this.client.post(`/ai/analyze/${containerId}`)
+    return response.data
+  }
+
+  async getAIRemediation(containerId: string): Promise<any> {
+    const response = await this.client.get(`/ai/remediation/${containerId}`)
     return response.data
   }
 }

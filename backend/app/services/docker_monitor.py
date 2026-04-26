@@ -120,6 +120,12 @@ class DockerMonitor:
             return self._container_service.restart_container(container_id)
         return False
     
+    def start_container(self, container_id: str) -> bool:
+        """Start a container."""
+        if self._container_service:
+            return self._container_service.start_container(container_id)
+        return False
+    
     def pause_container(self, container_id: str) -> bool:
         """Pause a container."""
         if self._container_service:
@@ -221,13 +227,20 @@ class DockerMonitor:
             return self._metrics_service.get_container_stats(container_id)
         return None
     
-    def store_metric(self, container_id: str, stats: dict) -> bool:
-        """Store a metric."""
+    def get_container_metrics(self, container_id: str, limit: int = 100) -> list:
+        """Get container metrics history."""
         if self._metrics_service:
-            return self._metrics_service.store_metric(container_id, stats)
-        return False
+            return self._metrics_service.get_metrics(container_id, limit=limit)
+        return []
     
-    def check_thresholds(self, container_id: str, stats: dict) -> Optional[list]:
+    def store_metrics_batch(self, metrics_list: List[dict]) -> bool:
+        """Store a batch of metrics."""
+        if self._metrics_service:
+            return self._metrics_service.store_metrics_batch(metrics_list)
+        return False
+
+    def check_thresholds(self, container_id: str, stats: dict):
+
         """Check metric thresholds."""
         if self._metrics_service:
             return self._metrics_service.check_thresholds(container_id, stats)
@@ -339,17 +352,25 @@ class DockerMonitor:
         # Sync containers to database on startup
         self._sync_containers_to_db()
         
+        sync_counter = 0
         while self._running:
             try:
                 containers = self.list_containers()
                 
+                # Sync every 60 iterations (60 * poll_interval seconds)
+                sync_counter += 1
+                if sync_counter >= 60:
+                    self._sync_containers_to_db()
+                    sync_counter = 0
+                
+                batch_metrics = []
                 for container in containers:
                     container_id = container["id"]
                     
-                    # Get and store metrics
+                    # Get stats
                     stats = self.get_container_stats(container_id)
                     if stats:
-                        self.store_metric(container_id, stats)
+                        batch_metrics.append(stats)
                         self._notify_callbacks({
                             "type": "metrics",
                             "container_id": container_id,
@@ -370,6 +391,10 @@ class DockerMonitor:
                         "timestamp": datetime.utcnow().isoformat(),
                     })
                 
+                # Store all metrics in one transaction
+                if batch_metrics:
+                    self.store_metrics_batch(batch_metrics)
+                
                 await asyncio.sleep(self.config.poll_interval)
                 
             except Exception as e:
@@ -381,15 +406,26 @@ class DockerMonitor:
         self._running = False
     
     def _sync_containers_to_db(self):
-        """Sync Docker containers to database."""
-        from app.db.database import get_session
+        """Sync Docker containers to database and handle removals."""
+        from app.db import get_session
         from app.db.models import Container as DBContainer
-        
+        from app.api.websocket import websocket_callback
+
         session = get_session()
         try:
             containers = self.list_containers()
-            existing_ids = {c.id for c in session.query(DBContainer.id).all()}
-            
+            current_docker_ids = {c["id"] for c in containers}
+
+            db_containers = session.query(DBContainer).all()
+            existing_ids = {c.id for c in db_containers}
+
+            # Get first admin user to assign orphans
+            from app.db.models import User
+            admin_user = session.query(User).filter(User.role == "admin").first()
+            admin_id = admin_user.id if admin_user else None
+
+            logger.info(f"Syncing {len(containers)} containers to DB. Admin ID for orphans: {admin_id}")
+            # Update or Add
             for c in containers:
                 if c["id"] in existing_ids:
                     db_container = (
@@ -400,22 +436,38 @@ class DockerMonitor:
                         db_container.image = c["image"]
                         db_container.status = c["status"]
                         db_container.last_updated = datetime.utcnow()
+                        # Assign to admin if no owner
+                        if db_container.user_id is None and admin_id:
+                            db_container.user_id = admin_id
                 else:
                     db_container = DBContainer(
                         id=c["id"],
                         name=c["name"],
                         image=c["image"],
-                        status=c["status"]
+                        status=c["status"],
+                        user_id=admin_id  # Default to admin
                     )
                     session.add(db_container)
-            
+
+            # Remove orphans (deleted from Docker directly)
+            for db_id in existing_ids:
+                if db_id not in current_docker_ids:
+                    db_container = session.query(DBContainer).filter(DBContainer.id == db_id).first()
+                    if db_container:
+                        session.delete(db_container)
+                        # Notify frontend about direct deletion
+                        websocket_callback({
+                            "type": "container_deleted",
+                            "container_id": db_id,
+                            "timestamp": datetime.utcnow().isoformat()
+                        })
+
             session.commit()
         except Exception as e:
             logger.error(f"Failed to sync containers: {e}")
             session.rollback()
         finally:
             session.close()
-
 
 # Singleton instance
 _docker_monitor: Optional[DockerMonitor] = None

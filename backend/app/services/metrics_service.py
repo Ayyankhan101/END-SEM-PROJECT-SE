@@ -3,10 +3,10 @@ Metrics collection and storage service.
 """
 import logging
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from docker.errors import APIError
 
-from app.db.database import get_session
+from app.db import get_session
 from app.db.models import Container, Metric, Alert
 from app.core.config import get_config
 from app.core.exceptions import ContainerNotFoundException
@@ -76,30 +76,25 @@ class MetricsService:
             "memory_limit": mem_limit,
         }
     
-    def store_metric(self, container_id: str, stats: Dict[str, Any]) -> bool:
-        """
-        Store a metric in the database.
-        
-        Args:
-            container_id: The container ID
-            stats: The metrics to store
+    def store_metrics_batch(self, metrics_list: List[Dict[str, Any]]) -> bool:
+        """Store a batch of metrics in a single transaction."""
+        if not metrics_list:
+            return True
             
-        Returns:
-            True if successful, False otherwise
-        """
         session = get_session()
         try:
-            metric = Metric(
-                container_id=container_id,
-                cpu_percent=stats.get("cpu_percent"),
-                memory_percent=stats.get("memory_percent"),
-                memory_usage=stats.get("memory_usage"),
-            )
-            session.add(metric)
+            for stats in metrics_list:
+                metric = Metric(
+                    container_id=stats.get("container_id"),
+                    cpu_percent=stats.get("cpu_percent"),
+                    memory_percent=stats.get("memory_percent"),
+                    memory_usage=stats.get("memory_usage"),
+                )
+                session.add(metric)
             session.commit()
             return True
         except Exception as e:
-            logger.error(f"Failed to store metric: {e}")
+            logger.error(f"Failed to store metrics batch: {e}")
             session.rollback()
             return False
         finally:

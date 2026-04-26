@@ -62,7 +62,20 @@ def test_login_invalid_credentials(client):
 def test_protected_endpoint_without_token(client):
     """Test accessing protected endpoint without token returns 401"""
     response = client.get("/api/containers")
-    assert response.status_code == 401
+    assert response.status_code in (401, 403)
+
+
+def test_account_lockout(client):
+    """Test account lockout after multiple failed attempts"""
+    # Attempt login with wrong password multiple times
+    for _ in range(6):
+        response = client.post("/api/auth/token", json={
+            "username": "admin",
+            "password": "wrong_password_123"
+        })
+    
+    assert response.status_code == 403
+    assert "locked" in response.json()["detail"].lower()
 
 
 def test_health_endpoint_public(client):

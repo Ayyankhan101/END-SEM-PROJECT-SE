@@ -1,13 +1,74 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
+from pydantic import BaseModel
 import logging
 
 logger = logging.getLogger(__name__)
 
+
+from app.api.utils import (
+    check_container_ownership,
+    check_resource_ownership,
+    check_stack_ownership
+)
+
+
+class BulkContainerIds(BaseModel):
+    container_ids: List[str]
+
+
+def _bulk_container_operation(container_ids: List[str], db: Session, operation: str, current_user: dict) -> dict:
+    """Generic bulk operation helper.
+    
+    Args:
+        container_ids: List of container IDs
+        db: Database session
+        operation: One of 'start', 'stop', 'restart', 'delete'
+        current_user: Authenticated user for ownership check
+    
+    Returns:
+        dict with status and results
+    """
+    from app.services.docker_monitor import get_docker_monitor
+    
+    monitor = get_docker_monitor()
+    results = []
+    
+    operation_map = {
+        'start': lambda cid: monitor.restart_container(cid),  # restart works for stopped containers
+        'stop': lambda cid: monitor.stop_container(cid),
+        'restart': lambda cid: monitor.restart_container(cid),
+        'delete': lambda cid: monitor.remove_container(cid),
+    }
+    
+    if operation not in operation_map:
+        raise HTTPException(status_code=400, detail=f"Invalid operation: {operation}")
+    
+    op_func = operation_map[operation]
+    
+    for container_id in container_ids:
+        try:
+            # Ownership check (raises 404/403 if unauthorized)
+            container = check_container_ownership(db, container_id, current_user)
+            success = op_func(container_id)
+            if operation == 'delete' and success:
+                db.delete(container)
+                db.commit()
+            results.append({"id": container_id, "success": success})
+        except HTTPException as e:
+            results.append({"id": container_id, "success": False, "error": e.detail})
+        except Exception as e:
+            logger.error(f"Bulk {operation} failed for {container_id}: {e}", exc_info=True)
+            results.append({"id": container_id, "success": False, "error": str(e)})
+    
+    return {"status": "success", "results": results}
+
+
 from app.db.models import get_db
-from app.db.models import Container, Metric, Alert, RecoveryAction, Stack, Host
+from app.db.models import Container, Metric, Alert, RecoveryAction, Stack, Host, AlertRule, Schedule
 from app.models.schemas import (
     ContainerResponse,
     ContainerDetail,
@@ -36,7 +97,7 @@ from app.models.schemas import (
     ScheduleResponse,
     ExecCreate,
 )
-from app.core.security import create_access_token, verify_password, get_current_user, get_password_hash, get_user_role
+from app.core.security import create_access_token, verify_password, get_current_user, get_password_hash, get_user_role, create_refresh_token, revoke_token, revoke_all_user_tokens
 from app.core.config import get_config
 from app.core.rate_limiter import limiter
 from app.core.validation import (
@@ -46,6 +107,28 @@ from app.core.validation import (
     validate_positive_int,
 )
 from pydantic import BaseModel
+from fastapi import Depends, HTTPException, status
+
+
+def get_current_user_with_auth(current_user: dict = Depends(get_current_user)):
+    """Get current user with additional authorization checks."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    return current_user
+
+
+def require_admin(current_user: dict = Depends(get_current_user_with_auth)):
+    """Require admin role."""
+    user_role = current_user.get("role")
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required"
+        )
+    return current_user
 
 
 router = APIRouter()
@@ -60,17 +143,57 @@ async def login(
     import pyotp
 
     user = db.query(User).filter(User.username == request_data.username).first()
-    if not user or not verify_password(request_data.password, user.hashed_password):
+    
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
         )
     
+    # Check lockout
+    if user.lockout_until and user.lockout_until > datetime.utcnow():
+        wait_seconds = int((user.lockout_until - datetime.utcnow()).total_seconds())
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Account locked. Try again in {wait_seconds} seconds.",
+        )
+
+    if not verify_password(request_data.password, user.hashed_password):
+        # Increment failed attempts
+        user.failed_login_attempts += 1
+        if user.failed_login_attempts >= 5:
+            user.lockout_until = datetime.utcnow() + timedelta(minutes=15)
+            user.failed_login_attempts = 0
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Too many failed attempts. Account locked for 15 minutes.",
+            )
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+    
+    # Reset failed attempts on success
+    user.failed_login_attempts = 0
+    user.lockout_until = None
+    db.commit()
+    
+    # If password change required, return 403 with header
+    if user.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Password must be changed",
+            headers={"X-Force-Password-Change": "true"}
+        )
+    
     if user.is_2fa_enabled and user.totp_secret:
         return TokenResponse(access_token="", requires_2fa=True, user_id=user.id)
     
-    token = create_access_token({"sub": user.username, "role": user.role})
-    return TokenResponse(access_token=token, user_id=user.id)
+    access_token = create_access_token({"sub": user.username, "role": user.role, "user_id": user.id}, fresh=True)
+    refresh_token = create_refresh_token({"sub": user.username, "role": user.role, "user_id": user.id})
+    return TokenResponse(access_token=access_token, refresh_token=refresh_token, user_id=user.id)
 
 
 @router.post("/auth/2fa/verify")
@@ -83,25 +206,50 @@ async def verify_2fa(
 ):
     from app.db.models import User
     import pyotp
+    import json
+    from app.core.security import decrypt_secret
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.totp_secret:
         raise HTTPException(status_code=400, detail="2FA not configured")
     
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(code):
-        raise HTTPException(status_code=401, detail="Invalid 2FA code")
-    
-    token = create_access_token({"sub": user.username, "role": user.role})
-    return TokenResponse(access_token=token, user_id=user.id)
+    # Try TOTP verification first
+    secret = decrypt_secret(user.totp_secret)
+    if not secret:
+        raise HTTPException(status_code=500, detail="Failed to decrypt 2FA secret")
+        
+    totp = pyotp.TOTP(secret)
+    if totp.verify(code):
+        access_token = create_access_token({"sub": user.username, "role": user.role, "user_id": user.id}, fresh=True)
+        refresh_token = create_refresh_token({"sub": user.username, "role": user.role, "user_id": user.id})
+        return TokenResponse(access_token=access_token, refresh_token=refresh_token, user_id=user.id)
+
+    # Try Backup Code verification
+    if user.backup_codes:
+        try:
+            codes_json = decrypt_secret(user.backup_codes)
+            backup_codes = json.loads(codes_json)
+            if code in backup_codes:
+                # Use code and remove it
+                backup_codes.remove(code)
+                user.backup_codes = encrypt_secret(json.dumps(backup_codes))
+                db.commit()
+                
+                access_token = create_access_token({"sub": user.username, "role": user.role, "user_id": user.id}, fresh=True)
+                refresh_token = create_refresh_token({"sub": user.username, "role": user.role, "user_id": user.id})
+                return TokenResponse(access_token=access_token, refresh_token=refresh_token, user_id=user.id)
+        except Exception as e:
+            logger.error(f"Backup code check failed: {e}")
+
+    raise HTTPException(status_code=401, detail="Invalid 2FA code")
 
 
-@router.post("/auth/2fa/setup", response_model=TOTPSetupResponse)
+@router.post("/auth/2fa/setup")
 @limiter.limit("10/minute")
 async def setup_2fa(
     request: Request,
     user_id: int,
-    code: str,
+    code: str = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -110,25 +258,35 @@ async def setup_2fa(
     import qrcode
     import io
     import base64
+    import secrets
+    import string
+    import json
+    from app.core.security import encrypt_secret, decrypt_secret
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # If user already has TOTP secret and code provided, verify it
+    # Verify code if provided (finalizing setup)
     if user.totp_secret and code:
-        totp = pyotp.TOTP(user.totp_secret)
+        secret = decrypt_secret(user.totp_secret)
+        if not secret:
+             raise HTTPException(status_code=500, detail="Failed to decrypt 2FA secret")
+             
+        totp = pyotp.TOTP(secret)
         if not totp.verify(code):
             raise HTTPException(status_code=401, detail="Invalid verification code")
         
+        # Generate backup codes
+        codes = [secrets.token_hex(4).upper() for _ in range(10)]
+        user.backup_codes = encrypt_secret(json.dumps(codes))
         user.is_2fa_enabled = 1
         db.commit()
-        return {"secret": user.totp_secret, "qr_code": ""}
+        return {"status": "success", "backup_codes": codes}
     
-    # If no secret exists, generate new one for initial setup
-    
+    # Generate new secret (initial step)
     secret = pyotp.random_base32()
-    user.totp_secret = secret
+    user.totp_secret = encrypt_secret(secret)
     db.commit()
     
     totp = pyotp.TOTP(secret)
@@ -167,7 +325,12 @@ async def disable_2fa(
         raise HTTPException(status_code=401, detail="Incorrect password")
     
     if user.totp_secret:
-        totp = pyotp.TOTP(user.totp_secret)
+        from app.core.security import decrypt_secret
+        secret = decrypt_secret(user.totp_secret)
+        if not secret:
+             raise HTTPException(status_code=500, detail="Failed to decrypt 2FA secret")
+             
+        totp = pyotp.TOTP(secret)
         if not totp.verify(code):
             raise HTTPException(status_code=401, detail="Invalid 2FA code")
     
@@ -176,6 +339,55 @@ async def disable_2fa(
     db.commit()
     
     return {"status": "success", "message": "2FA disabled"}
+
+
+@router.post("/auth/refresh")
+@limiter.limit("30/minute")
+async def refresh_token(
+    request: Request,
+    refresh_token: str,
+    db: Session = Depends(get_db)
+):
+    """Refresh access token using refresh token."""
+    try:
+        payload = verify_token(refresh_token)
+        if payload.get("type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type",
+            )
+        
+        username = payload.get("sub")
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        new_token = create_access_token({"sub": username, "role": user.role, "user_id": user.id}, fresh=False)
+        return {"access_token": new_token, "token_type": "bearer"}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+
+@router.post("/auth/logout")
+async def logout(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Logout and revoke current token."""
+    from fastapi import Request as FastRequest
+    # Extract token from header
+    auth_header = request.headers.get("authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        revoke_token(token)
+    
+    return {"status": "success", "message": "Logged out"}
 
 
 @router.post("/auth/logout-all")
@@ -208,10 +420,32 @@ async def list_containers(
     current_user: dict = Depends(get_current_user),
 ):
     query = db.query(Container)
+    # Restrict to user's containers unless admin
+    if get_user_role(current_user) != "admin":
+        user_id = current_user.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=403, detail="Invalid user")
+        query = query.filter(Container.user_id == user_id)
     if favorites:
         query = query.filter(Container.is_favorite == 1)
     containers = query.all()
     return containers
+
+
+@router.post("/containers/sync")
+@limiter.limit("10/minute")
+async def sync_containers(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Manually sync Docker containers to database."""
+    from app.services.docker_monitor import get_docker_monitor
+    
+    monitor = get_docker_monitor()
+    monitor._sync_containers_to_db()
+    
+    return {"status": "success", "message": "Containers synced"}
 
 
 @router.get("/containers/{container_id}", response_model=ContainerDetail)
@@ -223,31 +457,29 @@ async def get_container(
     current_user: dict = Depends(get_current_user),
 ):
     validated_id = validate_container_id(container_id)
-    container = db.query(Container).filter(Container.id == validated_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
-    
+    container = check_container_ownership(db, validated_id, current_user)
+
     from app.services.docker_monitor import get_docker_monitor
     monitor = get_docker_monitor()
     docker_info = monitor.get_container(container_id)
-    
+
     if docker_info:
         container.config = docker_info.get("config", {})
         container.network_settings = docker_info.get("network_settings", {})
-    
+
     return container
 
 
 @router.get("/containers/{container_id}/metrics")
+@limiter.limit("60/minute")
 async def get_container_metrics(
+    request: Request,
     container_id: str,
     limit: int = 100,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    container = db.query(Container).filter(Container.id == container_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
+    container = check_container_ownership(db, container_id, current_user)
 
     metrics = (
         db.query(Metric)
@@ -273,6 +505,7 @@ async def get_container_metrics(
 
 
 @router.get("/metrics/history")
+@limiter.limit("60/minute")
 async def get_metrics_history(
     request: Request,
     container_id: str = None,
@@ -284,7 +517,16 @@ async def get_metrics_history(
     query = db.query(Metric).filter(Metric.timestamp >= cutoff)
 
     if container_id:
+        # Enforce ownership on specific container
+        container = check_container_ownership(db, container_id, current_user)
         query = query.filter(Metric.container_id == container_id)
+    else:
+        # Filter metrics to only containers user owns
+        if get_user_role(current_user) != "admin":
+            user_id = current_user.get("user_id")
+            if user_id is None:
+                raise HTTPException(status_code=403, detail="Invalid user")
+            query = query.join(Container, Metric.container_id == Container.id).filter(Container.user_id == user_id)
 
     metrics = query.order_by(Metric.timestamp.desc()).all()
 
@@ -303,6 +545,7 @@ async def get_metrics_history(
 
 
 @router.get("/alerts", response_model=List[AlertResponse])
+@limiter.limit("60/minute")
 async def get_alerts(
     request: Request,
     limit: int = 50,
@@ -313,7 +556,16 @@ async def get_alerts(
     query = db.query(Alert).order_by(Alert.timestamp.desc())
 
     if container_id:
+        # Ensure user can access this container
+        container = check_container_ownership(db, container_id, current_user)
         query = query.filter(Alert.container_id == container_id)
+    else:
+        # Restrict to user's own containers unless admin
+        if get_user_role(current_user) != "admin":
+            user_id = current_user.get("user_id")
+            if user_id is None:
+                raise HTTPException(status_code=403, detail="Invalid user")
+            query = query.join(Container, Alert.container_id == Container.id).filter(Container.user_id == user_id)
 
     alerts = query.limit(limit).all()
     return alerts
@@ -328,10 +580,9 @@ async def restart_container(
     current_user: dict = Depends(get_current_user),
 ):
     from app.services.docker_monitor import get_docker_monitor
-
-    container = db.query(Container).filter(Container.id == container_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
+    
+    # Ownership check
+    check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
     success = monitor.restart_container(container_id)
@@ -352,6 +603,38 @@ async def restart_container(
         raise HTTPException(status_code=500, detail="Failed to restart container")
 
 
+@router.post("/containers/{container_id}/start")
+@limiter.limit("30/minute")
+async def start_container(
+    request: Request,
+    container_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    from app.services.docker_monitor import get_docker_monitor
+    
+    # Ownership check
+    check_container_ownership(db, container_id, current_user)
+
+    monitor = get_docker_monitor()
+    success = monitor.start_container(container_id)
+
+    if success:
+        action = RecoveryAction(
+            container_id=container_id, action_type="start", status="success"
+        )
+        db.add(action)
+        db.commit()
+        return {"status": "success", "message": f"Container {container_id} started"}
+    else:
+        action = RecoveryAction(
+            container_id=container_id, action_type="start", status="failed"
+        )
+        db.add(action)
+        db.commit()
+        raise HTTPException(status_code=500, detail="Failed to start container")
+
+
 @router.post("/containers/{container_id}/pause")
 @limiter.limit("30/minute")
 async def pause_container(
@@ -361,10 +644,9 @@ async def pause_container(
     current_user: dict = Depends(get_current_user),
 ):
     from app.services.docker_monitor import get_docker_monitor
-
-    container = db.query(Container).filter(Container.id == container_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
+    
+    # Ownership check
+    check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
     success = monitor.pause_container(container_id)
@@ -384,11 +666,9 @@ async def unpause_container(
     current_user: dict = Depends(get_current_user),
 ):
     from app.services.docker_monitor import get_docker_monitor
-
-    validated_id = validate_container_id(container_id)
-    container = db.query(Container).filter(Container.id == validated_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
+    
+    # Ownership check
+    check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
     success = monitor.unpause_container(container_id)
@@ -408,23 +688,33 @@ async def stop_container(
     current_user: dict = Depends(get_current_user),
 ):
     from app.services.docker_monitor import get_docker_monitor
-
-    validated_id = validate_container_id(container_id)
-    container = db.query(Container).filter(Container.id == validated_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
+    
+    # Ownership check
+    check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
     success = monitor.stop_container(container_id)
 
     if success:
+        action = RecoveryAction(
+            container_id=container_id, action_type="stop", status="success"
+        )
+        db.add(action)
+        db.commit()
         return {"status": "success", "message": f"Container {container_id} stopped"}
     else:
+        action = RecoveryAction(
+            container_id=container_id, action_type="stop", status="failed"
+        )
+        db.add(action)
+        db.commit()
         raise HTTPException(status_code=500, detail="Failed to stop container")
 
 
 @router.get("/containers/{container_id}/logs")
+@limiter.limit("60/minute")
 async def get_container_logs(
+    request: Request,
     container_id: str,
     lines: int = 100,
     db: Session = Depends(get_db),
@@ -432,9 +722,7 @@ async def get_container_logs(
 ):
     from app.services.docker_monitor import get_docker_monitor
 
-    container = db.query(Container).filter(Container.id == container_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
+    container = check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
     logs = monitor.get_container_logs(container_id, lines=lines)
@@ -466,6 +754,7 @@ async def create_container(
         name=result["name"],
         image=result["image"],
         status=result["status"],
+        user_id=current_user.get("user_id"),
     )
     db.add(container)
     db.commit()
@@ -474,10 +763,17 @@ async def create_container(
 
 
 @router.get("/stacks", response_model=List[StackResponse])
+@limiter.limit("60/minute")
 async def list_stacks(
+    request: Request,
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
-    stacks = db.query(Stack).order_by(Stack.created_at.desc()).all()
+    query = db.query(Stack)
+    if get_user_role(current_user) != "admin":
+        user_id = current_user.get("user_id")
+        query = query.filter(Stack.user_id == user_id)
+    
+    stacks = query.order_by(Stack.created_at.desc()).all()
     return stacks
 
 
@@ -492,37 +788,47 @@ async def create_stack(
     from app.services.docker_monitor import get_docker_monitor
 
     monitor = get_docker_monitor()
+    
+    # Deploy to Docker
     success = monitor.deploy_stack(stack.name, stack.compose_file)
-
     if not success:
         raise HTTPException(status_code=500, detail="Failed to deploy stack")
 
-    db_stack = Stack(name=stack.name, compose_file=stack.compose_file, status="running")
-    db.add(db_stack)
+    # Save to DB with ownership
+    new_stack = Stack(
+        name=stack.name,
+        compose_file=stack.compose_file,
+        user_id=current_user.get("user_id"),
+        status="running"
+    )
+    db.add(new_stack)
     db.commit()
-    db.refresh(db_stack)
-
-    return db_stack
+    db.refresh(new_stack)
+    
+    return new_stack
 
 
 @router.delete("/stacks/{stack_id}")
+@limiter.limit("20/minute")
 async def delete_stack(
+    request: Request,
     stack_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     from app.services.docker_monitor import get_docker_monitor
-
-    stack = db.query(Stack).filter(Stack.id == stack_id).first()
-    if not stack:
-        raise HTTPException(status_code=404, detail="Stack not found")
-
+    
+    # Ownership check
+    stack = check_stack_ownership(db, stack_id, current_user)
+    
+    # Remove from Docker
     monitor = get_docker_monitor()
     monitor.stop_stack(stack.name)
-
+    
+    # Delete from DB
     db.delete(stack)
     db.commit()
-
+    
     return {"status": "success", "message": f"Stack {stack.name} removed"}
 
 
@@ -577,7 +883,9 @@ async def stop_stack(
 
 
 @router.get("/hosts", response_model=List[HostResponse])
+@limiter.limit("60/minute")
 async def list_hosts(
+    request: Request,
     db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)
 ):
     hosts = db.query(Host).order_by(Host.last_seen.desc()).all()
@@ -611,7 +919,9 @@ async def create_host(
 
 
 @router.delete("/hosts/{host_id}")
+@limiter.limit("30/minute")
 async def delete_host(
+    request: Request,
     host_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -676,7 +986,9 @@ async def activate_host(
 
 
 @router.get("/settings", response_model=SettingsResponse)
+@limiter.limit("60/minute")
 async def get_settings(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -723,69 +1035,10 @@ async def update_settings(
 
 
 @router.post("/containers/bulk/start")
+@limiter.limit("30/minute")
 async def bulk_start_containers(
     request: Request,
-    container_ids: List[str],
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    from app.services.docker_monitor import get_docker_monitor
-
-    monitor = get_docker_monitor()
-    results = []
-    for container_id in container_ids:
-        container = db.query(Container).filter(Container.id == container_id).first()
-        if container:
-            success = monitor.restart_container(container_id)
-            results.append({"id": container_id, "success": success})
-    
-    return {"status": "success", "results": results}
-
-
-@router.post("/containers/bulk/stop")
-async def bulk_stop_containers(
-    request: Request,
-    container_ids: List[str],
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    from app.services.docker_monitor import get_docker_monitor
-
-    monitor = get_docker_monitor()
-    results = []
-    for container_id in container_ids:
-        container = db.query(Container).filter(Container.id == container_id).first()
-        if container:
-            success = monitor.stop_container(container_id)
-            results.append({"id": container_id, "success": success})
-    
-    return {"status": "success", "results": results}
-
-
-@router.post("/containers/bulk/restart")
-async def bulk_restart_containers(
-    request: Request,
-    container_ids: List[str],
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    from app.services.docker_monitor import get_docker_monitor
-
-    monitor = get_docker_monitor()
-    results = []
-    for container_id in container_ids:
-        container = db.query(Container).filter(Container.id == container_id).first()
-        if container:
-            success = monitor.restart_container(container_id)
-            results.append({"id": container_id, "success": success})
-    
-    return {"status": "success", "results": results}
-
-
-@router.post("/containers/bulk/delete")
-async def bulk_delete_containers(
-    request: Request,
-    container_ids: List[str],
+    body: BulkContainerIds,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -793,30 +1046,114 @@ async def bulk_delete_containers(
     if user_role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin role required for bulk delete"
+            detail="Admin role required for bulk start"
         )
+    return _bulk_container_operation(body.container_ids, db, 'start', current_user)
 
+
+@router.post("/containers/bulk/stop")
+@limiter.limit("30/minute")
+async def bulk_stop_containers(
+    request: Request,
+    body: BulkContainerIds,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_role = get_user_role(current_user)
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required for bulk stop"
+        )
+    return _bulk_container_operation(body.container_ids, db, 'stop', current_user)
+
+
+@router.post("/containers/bulk/restart")
+@limiter.limit("30/minute")
+async def bulk_restart_containers(
+    request: Request,
+    body: BulkContainerIds,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_role = get_user_role(current_user)
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required for bulk restart"
+        )
+    return _bulk_container_operation(body.container_ids, db, 'restart', current_user)
+
+
+@router.post("/containers/bulk/delete")
+@limiter.limit("30/minute")
+async def bulk_delete_containers(
+    request: Request,
+    body: BulkContainerIds,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    # _bulk_container_operation already handles ownership checks
+    return _bulk_container_operation(body.container_ids, db, 'delete', current_user)
+
+
+@router.delete("/containers/{container_id}")
+@limiter.limit("30/minute")
+async def delete_container(
+    request: Request,
+    container_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
     from app.services.docker_monitor import get_docker_monitor
+    
+    # Ownership check
+    container = check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
-    results = []
-    for container_id in container_ids:
-        container = db.query(Container).filter(Container.id == container_id).first()
-        if container:
-            try:
-                success = monitor.remove_container(container_id)
-                if success:
-                    db.delete(container)
-                    db.commit()
-                results.append({"id": container_id, "success": success})
-            except Exception as e:
-                logger.error(f"Failed to delete container {container_id}: {e}", exc_info=True)
-                results.append({"id": container_id, "success": False, "error": str(e)})
-    
-    return {"status": "success", "results": results}
+    success = monitor.remove_container(container_id)
+
+    if success:
+        # Delete from DB
+        db.delete(container)
+        db.commit()
+        
+        # Notify via WebSocket
+        from app.api.websocket import websocket_callback
+        websocket_callback({
+            "type": "container_deleted",
+            "container_id": container_id,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+        
+        return {"status": "success", "message": f"Container {container_id} deleted"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to delete container")
+
+
+@router.post("/containers/{container_id}/favorite")
+@limiter.limit("60/minute")
+async def toggle_container_favorite(
+    request: Request,
+    container_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    validated_id = validate_container_id(container_id)
+    container = check_container_ownership(db, validated_id, current_user)
+
+    container.is_favorite = 1 if container.is_favorite != 1 else 0
+    db.commit()
+
+    return {
+        "status": "success",
+        "is_favorite": container.is_favorite,
+        "message": f"Container {container_id} favorite toggled"
+    }
 
 
 @router.put("/containers/{container_id}/env")
+@limiter.limit("30/minute")
 async def update_container_env(
     request: Request,
     container_id: str,
@@ -824,66 +1161,81 @@ async def update_container_env(
     current_user: dict = Depends(get_current_user),
 ):
     validated_id = validate_container_id(container_id)
+    container = check_container_ownership(db, validated_id, current_user)
     from app.services.docker_monitor import get_docker_monitor
-    
+
     monitor = get_docker_monitor()
     success = monitor.update_container_env(validated_id, env_vars)
-    
+
     if success:
         return {"status": "success", "message": "Environment updated"}
     raise HTTPException(status_code=500, detail="Failed to update environment")
 
 
 @router.put("/containers/{container_id}/ports")
+@limiter.limit("30/minute")
 async def update_container_ports(
     request: Request,
     container_id: str,
     ports: Dict[str, int],
+    db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     validated_id = validate_container_id(container_id)
+    container = check_container_ownership(db, validated_id, current_user)
     from app.services.docker_monitor import get_docker_monitor
-    
+
     monitor = get_docker_monitor()
     success = monitor.update_container_ports(validated_id, ports)
-    
+
     if success:
         return {"status": "success", "message": "Ports updated"}
     raise HTTPException(status_code=500, detail="Failed to update ports")
 
 
 @router.put("/containers/{container_id}", response_model=ContainerResponse)
+@limiter.limit("30/minute")
 async def update_container(
+    request: Request,
     container_id: str,
     container_data: ContainerUpdate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     validated_id = validate_container_id(container_id)
-    container = db.query(Container).filter(Container.id == validated_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
-    
+    container = check_container_ownership(db, validated_id, current_user)
+
     if container_data.group is not None:
         container.group = container_data.group
-    
+
     db.commit()
     db.refresh(container)
     return container
 
 
 @router.get("/containers/group/{group}", response_model=List[ContainerResponse])
+@limiter.limit("60/minute")
 async def list_containers_by_group(
+    request: Request,
     group: str,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
-    containers = db.query(Container).filter(Container.group == group).all()
+    query = db.query(Container).filter(Container.group == group)
+    # Restrict to user's containers unless admin
+    if get_user_role(current_user) != "admin":
+        user_id = current_user.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=403, detail="Invalid user")
+        query = query.filter(Container.user_id == user_id)
+    containers = query.all()
     return containers
 
 
 @router.get("/users", response_model=List[UserResponse])
+@limiter.limit("60/minute")
 async def list_users(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -902,14 +1254,15 @@ async def list_users(
             username=u.username,
             role=u.role or "user",
             created_at=u.created_at,
-            must_change_password=bool(u.must_change_password)
         )
         for u in users
     ]
 
 
 @router.post("/users", response_model=UserResponse)
+@limiter.limit("30/minute")
 async def create_user(
+    request: Request,
     user_data: UserCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -934,7 +1287,6 @@ async def create_user(
         username=user_data.username,
         hashed_password=get_password_hash(user_data.password),
         role=user_data.role,
-        must_change_password=0
     )
     db.add(user)
     db.commit()
@@ -945,12 +1297,13 @@ async def create_user(
         username=user.username,
         role=user.role or "user",
         created_at=user.created_at,
-        must_change_password=bool(user.must_change_password)
     )
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
+@limiter.limit("30/minute")
 async def update_user(
+    request: Request,
     user_id: int,
     user_data: UserUpdate,
     db: Session = Depends(get_db),
@@ -976,10 +1329,6 @@ async def update_user(
         user.hashed_password = get_password_hash(user_data.password)
     if user_data.role:
         user.role = user_data.role
-    if user_data.must_change_password is not None:
-        user.must_change_password = 1 if user_data.must_change_password else 0
-    if user_data.force_password_change is not None:
-        user.must_change_password = 1 if user_data.force_password_change else 0
     
     db.commit()
     db.refresh(user)
@@ -989,12 +1338,13 @@ async def update_user(
         username=user.username,
         role=user.role or "user",
         created_at=user.created_at,
-        must_change_password=bool(user.must_change_password)
     )
 
 
 @router.delete("/users/{user_id}")
+@limiter.limit("30/minute")
 async def delete_user(
+    request: Request,
     user_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -1028,17 +1378,32 @@ async def delete_user(
 
 
 @router.get("/alert-rules", response_model=List[AlertRuleResponse])
+@limiter.limit("60/minute")
 async def list_alert_rules(
+    request: Request,
     container_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     from app.db.models import AlertRule
-    
+
     query = db.query(AlertRule)
     if container_id:
+        # Verify ownership of container
+        container = check_container_ownership(db, container_id, current_user)
         query = query.filter(AlertRule.container_id == container_id)
-    
+    else:
+        # Restrict to rules for user's containers or global
+        if get_user_role(current_user) != "admin":
+            user_id = current_user.get("user_id")
+            if user_id is None:
+                raise HTTPException(status_code=403, detail="Invalid user")
+            user_container_ids = db.query(Container.id).filter(Container.user_id == user_id).subquery()
+            query = query.filter(
+                (AlertRule.container_id.is_(None)) |
+                (AlertRule.container_id.in_(db.query(Container.id).filter(Container.user_id == user_id)))
+            )
+
     rules = query.all()
     return [
         AlertRuleResponse(
@@ -1055,7 +1420,9 @@ async def list_alert_rules(
 
 
 @router.post("/alert-rules", response_model=AlertRuleResponse)
+@limiter.limit("30/minute")
 async def create_alert_rule(
+    request: Request,
     rule_data: AlertRuleCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -1066,9 +1433,13 @@ async def create_alert_rule(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin or user role required"
         )
-    
+
+    # If container_id provided, ensure user owns that container
+    if rule_data.container_id:
+        container = check_container_ownership(db, rule_data.container_id, current_user)
+
     from app.db.models import AlertRule
-    
+
     rule = AlertRule(
         container_id=rule_data.container_id,
         name=rule_data.name,
@@ -1079,7 +1450,7 @@ async def create_alert_rule(
     db.add(rule)
     db.commit()
     db.refresh(rule)
-    
+
     return AlertRuleResponse(
         id=rule.id,
         container_id=rule.container_id,
@@ -1092,7 +1463,9 @@ async def create_alert_rule(
 
 
 @router.put("/alert-rules/{rule_id}", response_model=AlertRuleResponse)
+@limiter.limit("30/minute")
 async def update_alert_rule(
+    request: Request,
     rule_id: int,
     rule_data: AlertRuleUpdate,
     db: Session = Depends(get_db),
@@ -1106,14 +1479,18 @@ async def update_alert_rule(
         )
     
     from app.db.models import AlertRule
-    
+
     rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
     if not rule:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Alert rule not found"
         )
-    
+
+    # If rule targets a container, verify ownership
+    if rule.container_id:
+        container = check_container_ownership(db, rule.container_id, current_user)
+
     if rule_data.name is not None:
         rule.name = rule_data.name
     if rule_data.cpu_threshold is not None:
@@ -1122,10 +1499,10 @@ async def update_alert_rule(
         rule.memory_threshold = rule_data.memory_threshold
     if rule_data.enabled is not None:
         rule.enabled = 1 if rule_data.enabled else 0
-    
+
     db.commit()
     db.refresh(rule)
-    
+
     return AlertRuleResponse(
         id=rule.id,
         container_id=rule.container_id,
@@ -1138,7 +1515,9 @@ async def update_alert_rule(
 
 
 @router.delete("/alert-rules/{rule_id}")
+@limiter.limit("30/minute")
 async def delete_alert_rule(
+    request: Request,
     rule_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -1166,21 +1545,34 @@ async def delete_alert_rule(
 
 
 @router.get("/schedules", response_model=List[ScheduleResponse])
+@limiter.limit("60/minute")
 async def list_schedules(
+    request: Request,
     container_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     from app.db.models import Schedule
-    
+
     query = db.query(Schedule)
     if container_id:
+        # Verify ownership of the specified container
+        container = check_container_ownership(db, container_id, current_user)
         query = query.filter(Schedule.container_id == container_id)
-    
+    else:
+        # Restrict to schedules of user's containers (unless admin)
+        if get_user_role(current_user) != "admin":
+            user_id = current_user.get("user_id")
+            if user_id is None:
+                raise HTTPException(status_code=403, detail="Invalid user")
+            query = query.join(Container, Schedule.container_id == Container.id).filter(Container.user_id == user_id)
+
     schedules = query.all()
-    containers = db.query(Container).all()
+    # Build container name map only for containers user can see (filtered)
+    container_ids = [s.container_id for s in schedules]
+    containers = db.query(Container).filter(Container.id.in_(container_ids)).all()
     container_map = {c.id: c.name for c in containers}
-    
+
     return [
         ScheduleResponse(
             id=s.id,
@@ -1196,7 +1588,9 @@ async def list_schedules(
 
 
 @router.post("/schedules", response_model=ScheduleResponse)
+@limiter.limit("30/minute")
 async def create_schedule(
+    request: Request,
     schedule_data: ScheduleCreate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
@@ -1232,18 +1626,23 @@ async def create_schedule(
 
 
 @router.put("/schedules/{schedule_id}", response_model=ScheduleResponse)
+@limiter.limit("30/minute")
 async def update_schedule(
+    request: Request,
     schedule_id: int,
     schedule_data: ScheduleUpdate,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     from app.db.models import Schedule
-    
+
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
-    
+
+    # Verify user owns the container this schedule belongs to
+    container = check_container_ownership(db, schedule.container_id, current_user)
+
     if schedule_data.action is not None:
         if schedule_data.action not in ["start", "stop", "restart"]:
             raise HTTPException(status_code=400, detail="Action must be start, stop, or restart")
@@ -1252,16 +1651,14 @@ async def update_schedule(
         schedule.time = schedule_data.time
     if schedule_data.enabled is not None:
         schedule.enabled = 1 if schedule_data.enabled else 0
-    
+
     db.commit()
     db.refresh(schedule)
-    
-    container = db.query(Container).filter(Container.id == schedule.container_id).first()
-    
+
     return ScheduleResponse(
         id=schedule.id,
         container_id=schedule.container_id,
-        container_name=container.name if container else None,
+        container_name=container.name,
         action=schedule.action,
         time=schedule.time,
         enabled=bool(schedule.enabled),
@@ -1270,25 +1667,32 @@ async def update_schedule(
 
 
 @router.delete("/schedules/{schedule_id}")
+@limiter.limit("30/minute")
 async def delete_schedule(
+    request: Request,
     schedule_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     from app.db.models import Schedule
-    
+
     schedule = db.query(Schedule).filter(Schedule.id == schedule_id).first()
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
-    
+
+    # Ensure user owns the container this schedule belongs to
+    container = check_container_ownership(db, schedule.container_id, current_user)
+
     db.delete(schedule)
     db.commit()
-    
+
     return {"status": "success", "message": "Schedule deleted"}
 
 
 @router.post("/containers/{container_id}/exec")
+@limiter.limit("30/minute")
 async def create_exec(
+    request: Request,
     container_id: str,
     exec_data: ExecCreate,
     current_user: dict = Depends(get_current_user),
@@ -1314,3 +1718,200 @@ async def create_exec(
         raise HTTPException(status_code=500, detail="Failed to create exec session")
     
     return result
+
+
+@router.post("/auth/change-password")
+@limiter.limit("10/minute")
+async def change_password(
+    request: Request,
+    old_password: str,
+    new_password: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Change user password."""
+    from app.db.models import User
+    import re
+
+    # Validate password strength
+    if len(new_password) < 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 12 characters long"
+        )
+    if not re.search(r'[A-Z]', new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain uppercase letter"
+        )
+    if not re.search(r'[a-z]', new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain lowercase letter"
+        )
+    if not re.search(r'[0-9]', new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain digit"
+        )
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain special character"
+        )
+
+    username = current_user.get("sub")
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not verify_password(old_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect old password"
+        )
+    
+    if old_password == new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from old password"
+        )
+    
+    user.hashed_password = get_password_hash(new_password)
+    db.commit()
+    
+    # Revoke all tokens for user
+    revoke_all_user_tokens(username)
+    
+    return {"status": "success", "message": "Password changed successfully"}
+
+
+@router.post("/auth/force-change-password")
+@limiter.limit("10/minute")
+async def force_change_password(
+    request: Request,
+    new_password: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """Force password change (for first login or admin requirement)."""
+    from app.db.models import User
+    import re
+
+    username = current_user.get("sub")
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Validate password strength
+    if len(new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+    if not re.search(r'[A-Z]', new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain uppercase letter"
+        )
+    if not re.search(r'[a-z]', new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain lowercase letter"
+        )
+    if not re.search(r'[0-9]', new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain digit"
+        )
+    
+    user.hashed_password = get_password_hash(new_password)
+    user.must_change_password = 0
+    user.force_password_change = 0
+    db.commit()
+    
+    return {"status": "success", "message": "Password changed successfully"}
+
+
+from pydantic import BaseModel
+
+class PasswordChangeFirstLoginRequest(BaseModel):
+    username: str
+    old_password: str
+    new_password: str
+
+@router.post("/auth/change-password-first-login")
+@limiter.limit("10/minute")
+async def change_password_first_login(
+    request: Request,
+    request_data: PasswordChangeFirstLoginRequest,
+    db: Session = Depends(get_db)
+):
+    """Change password for first login - no authentication required."""
+    from app.db.models import User
+    import re
+
+    # Validate input
+    if not request_data.username or not request_data.old_password or not request_data.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username, old password, and new password are required"
+        )
+    
+    # Find user
+    user = db.query(User).filter(User.username == request_data.username).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid username or password"
+        )
+    
+    # Verify old password
+    if not verify_password(request_data.old_password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid username or password"
+        )
+    
+    # Validate password strength
+    if len(request_data.new_password) < 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 12 characters long"
+        )
+    if not re.search(r'[A-Z]', request_data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain uppercase letter"
+        )
+    if not re.search(r'[a-z]', request_data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain lowercase letter"
+        )
+    if not re.search(r'[0-9]', request_data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain digit"
+        )
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', request_data.new_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain special character"
+        )
+    
+    # Check if new password is different from old
+    if request_data.old_password == request_data.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from old password"
+        )
+    
+    # Update password 
+    user.hashed_password = get_password_hash(request_data.new_password)
+    db.commit()
+    
+    # Revoke all existing tokens for this user
+    revoke_all_user_tokens(request_data.username)
+    
+    return {"status": "success", "message": "Password changed successfully"}

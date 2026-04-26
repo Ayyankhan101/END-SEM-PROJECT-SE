@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { RefreshCw, Play, Pause, Wifi, WifiOff } from 'lucide-react'
+import { RefreshCw, Play, Pause, Wifi, WifiOff, Terminal as TerminalIcon } from 'lucide-react'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
+import { Terminal } from '@xterm/xterm'
+import { FitAddon } from '@xterm/addon-fit'
+import '@xterm/xterm/css/xterm.css'
 
 interface LogViewerProps {
   containerId: string;
@@ -9,29 +12,58 @@ interface LogViewerProps {
 
 function LogViewer({ containerId }: LogViewerProps) {
   const { socket } = useAuth()
-  const [logs, setLogs] = useState<string[]>([])
   const [loading, setLoading] = useState<boolean>(false)
   const [liveMode, setLiveMode] = useState<boolean>(false)
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const [lines, setLines] = useState<number>(100)
+  const terminalRef = useRef<HTMLDivElement>(null)
+  const xtermRef = useRef<Terminal | null>(null)
+  const fitAddonRef = useRef<FitAddon | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
-  const logsEndRef = useRef<HTMLDivElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const isUserScrollingRef = useRef<boolean>(false)
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const maxBuffer = 10000
+  useEffect(() => {
+    if (!terminalRef.current) return
+
+    const term = new Terminal({
+      theme: {
+        background: '#111827', // gray-900
+        foreground: '#10B981', // green-400
+      },
+      fontSize: 12,
+      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+      convertEol: true,
+      scrollback: 10000,
+      disableStdin: true
+    })
+
+    const fitAddon = new FitAddon()
+    term.loadAddon(fitAddon)
+    term.open(terminalRef.current)
+    fitAddon.fit()
+
+    xtermRef.current = term
+    fitAddonRef.current = fitAddon
+
+    const handleResize = () => fitAddon.fit()
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      term.dispose()
+    }
+  }, [])
 
   const fetchInitialLogs = useCallback(async () => {
+    if (!xtermRef.current) return
     setLoading(true)
+    xtermRef.current.clear()
     try {
       const data = await api.getContainerLogs(containerId, lines)
       if (data.logs) {
-        const logLines = data.logs.split('\n').filter((l: string) => l)
-        setLogs(logLines.slice(-maxBuffer))
+        xtermRef.current.write(data.logs)
       }
     } catch (err) {
-      console.error('Failed to fetch logs:', err)
+      xtermRef.current.write('\r\n\x1b[31mFailed to fetch logs\x1b[0m\r\n')
     } finally {
       setLoading(false)
     }
@@ -51,69 +83,25 @@ function LogViewer({ containerId }: LogViewerProps) {
       return
     }
 
+    const token = localStorage.getItem('token')
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs/${containerId}`
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/logs/${containerId}?token=${token}`
+
     
     const ws = new WebSocket(wsUrl)
     wsRef.current = ws
 
-    ws.onopen = () => {
-      setIsConnected(true)
-    }
-
+    ws.onopen = () => setIsConnected(true)
     ws.onmessage = (event) => {
-      setLogs(prev => {
-        const newLogs = [...prev, event.data]
-        if (newLogs.length > maxBuffer) {
-          return newLogs.slice(-maxBuffer)
-        }
-        return newLogs
-      })
+      if (xtermRef.current) {
+        xtermRef.current.write(event.data)
+      }
     }
+    ws.onerror = () => setIsConnected(false)
+    ws.onclose = () => setIsConnected(false)
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
-    }
-
-    ws.onclose = () => {
-      setIsConnected(false)
-    }
-
-    return () => {
-      ws.close()
-    }
+    return () => ws.close()
   }, [liveMode, containerId])
-
-  useEffect(() => {
-    if (!isUserScrollingRef.current && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: 'auto' })
-    }
-  }, [logs])
-
-  const handleScroll = () => {
-    if (!containerRef.current) return
-    
-    const { scrollTop, scrollHeight, clientHeight } = containerRef.current
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50
-    
-    if (!isAtBottom && liveMode) {
-      isUserScrollingRef.current = true
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current)
-      }
-      scrollTimeoutRef.current = setTimeout(() => {
-        isUserScrollingRef.current = false
-      }, 1000)
-    }
-  }
-
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current)
-      }
-    }
-  }, [])
 
   return (
     <div className="bg-gray-800 rounded-lg p-4">
@@ -156,18 +144,10 @@ function LogViewer({ containerId }: LogViewerProps) {
       </div>
 
       <div 
-        ref={containerRef}
-        onScroll={handleScroll}
-        className="bg-gray-900 rounded p-4 h-96 overflow-auto font-mono text-sm"
+        ref={terminalRef}
+        className="bg-gray-900 rounded p-2 h-96 overflow-hidden"
       >
-        {loading && logs.length === 0 ? (
-          <div className="text-gray-400">Loading logs...</div>
-        ) : logs.length > 0 ? (
-          <pre className="text-green-400 whitespace-pre-wrap">{logs.join('\n')}</pre>
-        ) : (
-          <div className="text-gray-400">No logs available</div>
-        )}
-        <div ref={logsEndRef} />
+        {loading && <div className="text-gray-400 absolute p-2">Loading logs...</div>}
       </div>
     </div>
   )

@@ -1,12 +1,12 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Save, RefreshCw, Settings as SettingsIcon, AlertCircle, Sun, Moon, Shield, ShieldCheck, KeyRound, X } from 'lucide-react'
+import { ArrowLeft, Save, RefreshCw, Settings as SettingsIcon, AlertCircle, Sun, Moon, Shield, ShieldCheck, KeyRound, X, Monitor } from 'lucide-react'
 import { api } from '@/services/api'
 import { useAuth } from '@/App'
 import type { Settings as SettingsType } from '@/types'
 
 function Settings() {
-  const { theme, setTheme, userId } = useAuth()
+  const { theme, setTheme, userId, resolvedTheme } = useAuth()
   const [loading, setLoading] = useState<boolean>(true)
   const [saving, setSaving] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
@@ -108,21 +108,45 @@ function Settings() {
 
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
-        <div className="bg-gray-800 p-4 rounded-lg mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
-            <span className="font-medium">Theme</span>
+        <div className="bg-gray-800 p-4 rounded-lg mb-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {resolvedTheme === 'dark' ? <Moon className="w-5 h-5 text-yellow-400" /> : <Sun className="w-5 h-5 text-orange-400" />}
+              <span className="font-medium">Theme</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setTheme('light')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                  resolvedTheme === 'light' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-700 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Sun className="w-4 h-4" /> Light
+              </button>
+              <button
+                onClick={() => setTheme('dark')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                  resolvedTheme === 'dark' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-700 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Moon className="w-4 h-4" /> Dark
+              </button>
+              <button
+                onClick={() => setTheme('system')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                  theme === 'system' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-700 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Monitor className="w-4 h-4" /> System
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400' 
-                : 'bg-blue-600 hover:bg-blue-500 text-white'
-            }`}
-          >
-            {theme === 'dark' ? 'Dark' : 'Light'}
-          </button>
         </div>
 
         <div className="bg-gray-800 p-4 rounded-lg mb-6">

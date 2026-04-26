@@ -10,17 +10,20 @@ function Login() {
   const [requires2FA, setRequires2FA] = useState<boolean>(false)
   const [userId, setUserId] = useState<number | null>(null)
   const [error, setError] = useState<string>('')
+  const [isLoading, setIsLoading] = useState<boolean>(false)
   const { login: authLogin } = useAuth()
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
+    setIsLoading(true)
     try {
       if (requires2FA) {
         const currentUserId = userId || parseInt(localStorage.getItem('pendingUserId') || '0', 10)
         if (!currentUserId) {
           setError('Session expired. Please login again.')
           setRequires2FA(false)
+          setIsLoading(false)
           return
         }
         const data = await api.verify2FA(currentUserId, twoFactorCode)
@@ -30,6 +33,7 @@ function Login() {
         const data = await api.login({ username, password })
         if (data.requires_2fa) {
           setRequires2FA(true)
+          setIsLoading(false)
           const newUserId = data.user_id || null
           setUserId(newUserId)
           if (newUserId) {
@@ -41,6 +45,8 @@ function Login() {
       }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed')
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -86,7 +92,7 @@ function Login() {
                 <input
                   id="password"
                   type="password"
-                  name="current-password"
+                  name="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-gray-700 text-white px-4 py-2 rounded focus:ring-2 focus:ring-blue-500"
@@ -106,7 +112,7 @@ function Login() {
                   name="one-time-code"
                   value={twoFactorCode}
                   onChange={(e) => setTwoFactorCode(e.target.value)}
-                  placeholder="Enter 6-digit code…"
+                  placeholder="Enter 6-digit code"
                   className="w-full bg-gray-700 text-white px-4 py-2 rounded focus:ring-2 focus:ring-blue-500"
                   required
                   maxLength={6}
@@ -128,16 +134,19 @@ function Login() {
           
           <button
             type="submit"
+            disabled={isLoading}
             className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
           >
-            {requires2FA ? <KeyRound className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-            {requires2FA ? 'Verify' : 'Sign In'}
+            {isLoading ? (
+              <span>Signing in...</span>
+            ) : (
+              <>
+                {requires2FA ? <KeyRound className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                {requires2FA ? 'Verify' : 'Sign In'}
+              </>
+            )}
           </button>
         </form>
-        
-        <p className="text-gray-500 text-xs text-center mt-4">
-          Check logs for temporary password on first start
-        </p>
       </div>
     </div>
   )

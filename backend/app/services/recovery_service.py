@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from enum import Enum
 
-from app.db.database import get_session
+from app.db import get_session
 from app.db.models import RecoveryAction
 from app.core.config import get_config
 
