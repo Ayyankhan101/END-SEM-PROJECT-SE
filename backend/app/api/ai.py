@@ -16,11 +16,14 @@ router = APIRouter(prefix="/ai", tags=["AI"])
 @router.get("/health")
 async def ai_health_check():
     """Check AI services availability."""
+    import os
     ollama = get_ollama_client()
     ollama_available = ollama.health_check()
     
+    provider = os.getenv("AI_PROVIDER", "ollama").lower()
+    
     return {
-        "ollama": {
+        provider: {
             "available": ollama_available,
             "model": ollama.model,
             "endpoint": ollama.base_url
@@ -277,5 +280,5 @@ async def get_ai_insights():
             "severity_breakdown": severity_counts
         },
         "anomalies": all_anomalies,
-        "ollama_available": ollama.health_check()
+        "provider_available": ollama.health_check()
     }

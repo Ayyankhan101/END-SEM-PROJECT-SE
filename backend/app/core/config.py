@@ -66,8 +66,8 @@ class DockerConfig(BaseModel):
 
 class MonitoringConfig(BaseModel):
     failure_detection_timeout: int = 30
-    cpu_threshold: float = 90
-    memory_threshold: float = 90
+    cpu_threshold: float = 85
+    memory_threshold: float = 85
     pid_threshold: int = 1000
 
 
@@ -117,7 +117,7 @@ class CORSConfig(BaseModel):
 
 
 class AIConfig(BaseModel):
-    provider: str = "ollama"  # "ollama", "openai", "anthropic", "together"
+    provider: str = "ollama"  # "ollama", "openai", "anthropic", "together", "groq"
     api_key: str = ""
     endpoint: str = "http://localhost:11434"
     model: str = "llama3"

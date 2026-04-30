@@ -55,7 +55,8 @@ function AIInsights() {
   const [insights, setInsights] = useState<{
     summary: InsightsSummary
     anomalies: RemediationPlan[]
-    ollama_available: boolean
+    provider_available: boolean
+    provider_name: string
   } | null>(null)
   const [error, setError] = useState<string>('')
 
@@ -64,7 +65,10 @@ function AIInsights() {
     setError('')
     try {
       const data = await api.getAIInsights() as any
-      setInsights(data)
+      const health = await api.getAIHealth()
+      const providerName = Object.keys(health)[0] || 'ai'
+      const providerAvailable = Object.values(health)[0]?.available || false
+      setInsights({ ...data, provider_name: providerName, provider_available: providerAvailable })
     } catch (err) {
       setError('Failed to load AI insights')
       console.error(err)
@@ -124,9 +128,9 @@ function AIInsights() {
       </div>
 
       <div className="flex items-center gap-2 p-3 bg-card rounded-lg border border-border">
-        <div className={`w-2 h-2 rounded-full ${insights?.ollama_available ? 'bg-green-500' : 'bg-red-500'}`} />
+        <div className={`w-2 h-2 rounded-full ${insights?.provider_available ? 'bg-green-500' : 'bg-red-500'}`} />
         <span className="text-sm">
-          Ollama: {insights?.ollama_available ? 'Connected' : 'Unavailable'}
+          {insights?.provider_name?.toUpperCase() || 'AI'}: {insights?.provider_available ? 'Connected' : 'Unavailable'}
         </span>
       </div>
 

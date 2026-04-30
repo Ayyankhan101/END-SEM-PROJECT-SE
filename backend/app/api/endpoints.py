@@ -416,16 +416,19 @@ async def logout_all_devices(
 async def list_containers(
     request: Request,
     favorites: bool = False,
+    show_all: bool = True,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     query = db.query(Container)
-    # Restrict to user's containers unless admin
-    if get_user_role(current_user) != "admin":
-        user_id = current_user.get("user_id")
-        if user_id is None:
-            raise HTTPException(status_code=403, detail="Invalid user")
-        query = query.filter(Container.user_id == user_id)
+    # Show all containers by default (matching AI Insights)
+    # Set show_all=False to filter by user ownership
+    if not show_all:
+        if get_user_role(current_user) != "admin":
+            user_id = current_user.get("user_id")
+            if user_id is None:
+                raise HTTPException(status_code=403, detail="Invalid user")
+            query = query.filter(Container.user_id == user_id)
     if favorites:
         query = query.filter(Container.is_favorite == 1)
     containers = query.all()

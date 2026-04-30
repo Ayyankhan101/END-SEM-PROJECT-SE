@@ -76,6 +76,34 @@ class MetricsService:
             "memory_limit": mem_limit,
         }
     
+    def get_metrics(self, container_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get historical metrics for a container from database."""
+        session = get_session()
+        try:
+            from sqlalchemy import desc
+            metrics = (
+                session.query(Metric)
+                .filter(Metric.container_id == container_id)
+                .order_by(desc(Metric.timestamp))
+                .limit(limit)
+                .all()
+            )
+            return [
+                {
+                    "container_id": m.container_id,
+                    "cpu_percent": m.cpu_percent,
+                    "memory_percent": m.memory_percent,
+                    "memory_usage": m.memory_usage,
+                    "timestamp": m.timestamp.isoformat() if m.timestamp else None
+                }
+                for m in metrics
+            ]
+        except Exception as e:
+            logger.error(f"Failed to get metrics for {container_id}: {e}")
+            return []
+        finally:
+            session.close()
+
     def store_metrics_batch(self, metrics_list: List[Dict[str, Any]]) -> bool:
         """Store a batch of metrics in a single transaction."""
         if not metrics_list:

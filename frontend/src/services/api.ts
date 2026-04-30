@@ -551,7 +551,7 @@ class ApiClient {
   }
 
   // AI endpoints
-  async getAIHealth(): Promise<{ ollama: { available: boolean; model: string; endpoint: string } }> {
+  async getAIHealth(): Promise<Record<string, { available: boolean; model: string; endpoint: string }>> {
     const response = await this.client.get('/ai/health')
     return response.data
   }

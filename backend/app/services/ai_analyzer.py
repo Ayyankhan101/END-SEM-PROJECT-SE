@@ -59,24 +59,46 @@ class OllamaClient:
 
     def _build_prompt(self, anomaly: Dict, metrics: Dict) -> str:
         """Build analysis prompt for anomaly."""
-        return f"""You are a specialized DevOps AI assistant. Analyze this container anomaly:
+        container_name = anomaly.get('container_name', 'unknown')
+        anomaly_type = anomaly.get('anomaly_type', 'unknown')
+        severity = anomaly.get('severity', 'medium')
+        message = anomaly.get('message', '')
+        metric_value = anomaly.get('metric_value', 0)
+        threshold = anomaly.get('threshold', 0)
+        container_id = anomaly.get('container_id', '')[:12]
+        
+        cpu = metrics.get('cpu_percent', 0)
+        mem = metrics.get('memory_percent', 0)
+        
+        return f"""You are a senior SRE and DevOps expert specializing in Docker container diagnostics. Analyze this anomaly with deep technical detail.
 
-Anomaly Details:
-- Container: {anomaly.get('container_name', 'unknown')}
-- Type: {anomaly.get('anomaly_type', 'unknown')}
-- Severity: {anomaly.get('severity', 'medium')}
-- Message: {anomaly.get('message', '')}
-- Value: {anomaly.get('metric_value', 0)} (threshold: {anomaly.get('threshold', 0)})
+## Container Context
+- Name: {container_name}
+- ID: {container_id}
+- Image: {anomaly.get('image', 'unknown')}
 
-Current Metrics:
-- CPU: {metrics.get('cpu_percent', 0):.1f}%
-- Memory: {metrics.get('memory_percent', 0):.1f}%
+## Anomaly Details
+- Type: {anomaly_type}
+- Severity: {severity.upper()}
+- Description: {message}
+- Measured: {metric_value:.1f}% (threshold: {threshold}%)
 
-Provide:
-1. Root cause (Technical)
-2. 3 specific recommendations
+## Current Metrics
+- CPU Usage: {cpu:.1f}%
+- Memory Usage: {mem:.1f}%
+- Memory Usage (bytes): {metrics.get('memory_usage', 0) / 1024 / 1024:.1f} MB
 
-Format as JSON with keys: summary, root_cause, severity, recommendations[], confidence"""
+## Analysis Required
+Provide a detailed JSON response with:
+1. "summary": Brief technical summary (1-2 sentences)
+2. "root_cause": Detailed root cause analysis - why this is happening
+3. "severity": Re-assessed severity (low/medium/high/critical) based on analysis
+4. "recommendations": Array of 4-5 specific, actionable remediation steps
+5. "confidence": Float 0-1 indicating confidence in analysis
+6. "docker_commands": Optional array of docker commands to help diagnose (docker exec, docker logs, etc.)
+7. "urgency": "immediate"/"soon"/"monitor" - how quickly action is needed
+
+Format as valid JSON only, no markdown wrapping."""
 
     def analyze_container_health(self, container: Dict, metrics: List[Dict]) -> AIAnalysisResult:
         """Get overall health analysis for a container with heuristics."""
@@ -150,26 +172,52 @@ Format as JSON with keys: summary, root_cause, severity, recommendations[], conf
         
         avg_cpu = sum(cpu_vals) / len(cpu_vals) if cpu_vals else 0
         avg_mem = sum(mem_vals) / len(mem_vals) if mem_vals else 0
+        max_cpu = max(cpu_vals) if cpu_vals else 0
+        max_mem = max(mem_vals) if mem_vals else 0
         
-        heuristic_context = f"\nHeuristic findings: {heuristics.get('summary')}" if heuristics else ""
+        container_name = container.get('name', 'unknown')
+        container_id = container.get('id', '')[:12]
+        container_status = container.get('status', 'unknown')
+        container_image = container.get('image', 'unknown')
         
-        return f"""You are a specialized Docker & SRE expert. Analyze container health:
+        trend_cpu = "increasing" if len(cpu_vals) >= 2 and cpu_vals[-1] > cpu_vals[0] else "stable/decreasing"
+        trend_mem = "increasing" if len(mem_vals) >= 2 and mem_vals[-1] > mem_vals[0] else "stable/decreasing"
+        
+        heuristic_context = ""
+        if heuristics:
+            heuristic_context = f"""
+## Heuristic Analysis (automated)
+- Summary: {heuristics.get('summary', 'N/A')}
+- Possible Cause: {heuristics.get('possible_cause', 'N/A')}
+- Severity: {heuristics.get('severity', 'medium')}"""
+        
+        return f"""You are a senior SRE and Kubernetes/Docker expert. Perform a comprehensive health analysis.
 
-Container: {container.get('name', 'unknown')}
-Status: {container.get('status', 'unknown')}
-Image: {container.get('image', 'unknown')}
-{heuristic_context}
+## Container Context
+- Name: {container_name}
+- ID: {container_id}
+- Status: {container_status}
+- Image: {container_image}
+- CPU Trend: {trend_cpu}
+- Memory Trend: {trend_mem}{heuristic_context}
 
-Metrics (last {len(metrics)} samples):
-- Avg CPU: {avg_cpu:.1f}% | Max CPU: {max(cpu_vals) if cpu_vals else 0:.1f}%
-- Avg Memory: {avg_mem:.1f}% | Max Memory: {max(mem_vals) if mem_vals else 0:.1f}%
+## Metrics Analysis (last {len(metrics)} samples)
+| Metric | Current | Avg | Max |
+|--------|---------|-----|-----|
+| CPU % | {cpu_vals[-1] if cpu_vals else 0:.1f} | {avg_cpu:.1f} | {max_cpu:.1f} |
+| Memory % | {mem_vals[-1] if mem_vals else 0:.1f} | {avg_mem:.1f} | {max_mem:.1f} |
 
-Provide:
-1. Deep health summary (Technical)
-2. Likely root cause
-3. 3 actionable, specific DevOps recommendations
+## Analysis Required
+Provide detailed JSON with:
+1. "summary": 2-3 sentence health assessment
+2. "root_cause": Primary cause if issues found
+3. "severity": low/medium/high/critical
+4. "recommendations": 4-5 actionable steps with priority
+5. "confidence": 0-1 confidence score
+6. "trends": Object with cpu_trend and memory_trend predictions
+7. "alert_if": Conditions that should trigger immediate alerts
 
-Format as JSON with keys: summary, root_cause, severity, recommendations[], confidence"""
+Return valid JSON only."""
 
     def _generate(self, prompt: str) -> str:
         """Call Ollama API (local or cloud)."""
@@ -238,6 +286,8 @@ Format as JSON with keys: summary, root_cause, severity, recommendations[], conf
             return self._generate_anthropic(prompt)
         elif provider == "together":
             return self._generate_together(prompt)
+        elif provider == "groq":
+            return self._generate_groq(prompt)
         else:
             # Default: Ollama cloud
             url = "https://api.ollama.com/v1/chat/completions"
@@ -343,11 +393,72 @@ Format as JSON with keys: summary, root_cause, severity, recommendations[], conf
         
         return response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
 
+    def _generate_groq(self, prompt: str) -> str:
+        """Call Groq API."""
+        import requests
+        
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY not set")
+        
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        
+        payload = {
+            "model": os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile"),
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": 512
+        }
+        
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
+        response.raise_for_status()
+        
+        return response.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+
     def health_check(self) -> bool:
-        """Check if Ollama is accessible."""
+        """Check if AI provider is accessible."""
         try:
             import requests
-            if self.use_cloud and self.api_key:
+            provider = os.getenv("AI_PROVIDER", "ollama").lower()
+            
+            if provider == "groq":
+                api_key = os.getenv("GROQ_API_KEY")
+                if not api_key:
+                    return False
+                url = "https://api.groq.com/openai/v1/models"
+                headers = {"Authorization": f"Bearer {api_key}"}
+                response = requests.get(url, headers=headers, timeout=5)
+                return response.status_code == 200
+            elif provider == "openai":
+                api_key = os.getenv("OPENAI_API_KEY")
+                if not api_key:
+                    return False
+                url = "https://api.openai.com/v1/models"
+                headers = {"Authorization": f"Bearer {api_key}"}
+                response = requests.get(url, headers=headers, timeout=5)
+                return response.status_code == 200
+            elif provider == "anthropic":
+                api_key = os.getenv("ANTHROPIC_API_KEY")
+                if not api_key:
+                    return False
+                url = "https://api.anthropic.com/v1/models"
+                headers = {"x-api-key": api_key}
+                response = requests.get(url, headers=headers, timeout=5)
+                return response.status_code == 200
+            elif provider == "together":
+                api_key = os.getenv("TOGETHER_API_KEY")
+                if not api_key:
+                    return False
+                url = "https://api.together.xyz/v1/models"
+                headers = {"Authorization": f"Bearer {api_key}"}
+                response = requests.get(url, headers=headers, timeout=5)
+                return response.status_code == 200
+            elif self.use_cloud and self.api_key:
                 url = "https://api.ollama.com/v1/models"
                 headers = {"Authorization": f"Bearer {self.api_key}"}
                 response = requests.get(url, headers=headers, timeout=5)

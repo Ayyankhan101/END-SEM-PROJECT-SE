@@ -357,11 +357,8 @@ class DockerMonitor:
             try:
                 containers = self.list_containers()
                 
-                # Sync every 60 iterations (60 * poll_interval seconds)
-                sync_counter += 1
-                if sync_counter >= 60:
-                    self._sync_containers_to_db()
-                    sync_counter = 0
+                # Sync every iteration to ensure new containers are tracked
+                self._sync_containers_to_db()
                 
                 batch_metrics = []
                 for container in containers:

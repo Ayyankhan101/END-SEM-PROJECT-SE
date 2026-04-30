@@ -40,12 +40,12 @@ class Anomaly:
 
 @dataclass
 class AnomalyConfig:
-    cpu_spike_threshold: float = 80.0
-    cpu_sustained_threshold: float = 70.0
+    cpu_spike_threshold: float = 75.0
+    cpu_sustained_threshold: float = 65.0
     memory_spike_threshold: float = 80.0
-    memory_growth_rate_threshold: float = 10.0
-    restart_count_threshold: int = 3
-    restart_time_window_minutes: int = 60
+    memory_growth_rate_threshold: float = 5.0
+    restart_count_threshold: int = 2
+    restart_time_window_minutes: int = 30
 
 
 class AnomalyDetector:
