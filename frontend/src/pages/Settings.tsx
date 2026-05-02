@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Save, RefreshCw, Settings as SettingsIcon, AlertCircle, Sun, Moon, Shield, ShieldCheck, KeyRound, X, Monitor } from 'lucide-react'
+import { ArrowLeft, Save, RefreshCw, Settings as SettingsIcon, AlertCircle, Sun, Moon, Shield, ShieldCheck, KeyRound, X, Monitor, Heart } from 'lucide-react'
 import { api } from '@/services/api'
 import { useAuth } from '@/App'
 import type { Settings as SettingsType } from '@/types'
@@ -111,7 +111,7 @@ function Settings() {
         <div className="bg-gray-800 p-4 rounded-lg mb-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {resolvedTheme === 'dark' ? <Moon className="w-5 h-5 text-yellow-400" /> : <Sun className="w-5 h-5 text-orange-400" />}
+              {resolvedTheme === 'dark' ? <Moon className="w-5 h-5 text-yellow-400" /> : resolvedTheme === 'pink' ? <Heart className="w-5 h-5 text-pink-500" /> : <Sun className="w-5 h-5 text-orange-400" />}
               <span className="font-medium">Theme</span>
             </div>
             <div className="flex items-center gap-2">
@@ -128,12 +128,22 @@ function Settings() {
               <button
                 onClick={() => setTheme('dark')}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                  resolvedTheme === 'dark' 
+                  theme === 'dark' 
                     ? 'bg-blue-600 text-white' 
                     : 'bg-gray-700 text-gray-400 hover:text-white'
                 }`}
               >
                 <Moon className="w-4 h-4" /> Dark
+              </button>
+              <button
+                onClick={() => setTheme('pink')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                  theme === 'pink' 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-700 text-gray-400 hover:text-white'
+                }`}
+              >
+                <Heart className="w-4 h-4" /> Pink
               </button>
               <button
                 onClick={() => setTheme('system')}
