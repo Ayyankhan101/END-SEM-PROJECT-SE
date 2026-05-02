@@ -20,7 +20,7 @@ import Schedules from './pages/Schedules'
 import AIInsights from './pages/AIInsights'
 import ErrorBoundary from './components/ErrorBoundary'
 
-type Theme = 'light' | 'dark' | 'system'
+type Theme = 'light' | 'dark' | 'pink' | 'system'
 
 interface AuthContextType {
   token: string | null;
@@ -33,7 +33,7 @@ interface AuthContextType {
   setAlerts: React.Dispatch<React.SetStateAction<any[]>>;
   isConnected: boolean;
   theme: Theme;
-  resolvedTheme: 'light' | 'dark';
+  resolvedTheme: 'light' | 'dark' | 'pink';
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
   userId: number | null;
@@ -105,37 +105,34 @@ function App() {
   }, [token, connectionChecked])
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('theme')
-    return (saved === 'light' || saved === 'dark' || saved === 'system') ? saved : 'dark'
+    return (saved === 'light' || saved === 'dark' || saved === 'pink' || saved === 'system') ? saved : 'dark'
   })
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark')
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark' | 'pink'>('dark')
 
   useEffect(() => {
     localStorage.setItem('theme', theme)
     
-    const applyTheme = (isDark: boolean) => {
-      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light')
-      if (isDark) {
-        document.documentElement.classList.add('dark')
-        document.documentElement.classList.remove('light')
-      } else {
-        document.documentElement.classList.add('light')
-        document.documentElement.classList.remove('dark')
-      }
-      setResolvedTheme(isDark ? 'dark' : 'light')
+    const applyTheme = (nextTheme: 'light' | 'dark' | 'pink') => {
+      document.documentElement.setAttribute('data-theme', nextTheme)
+      document.documentElement.classList.toggle('dark', nextTheme === 'dark')
+      document.documentElement.classList.toggle('light', nextTheme === 'light')
+      document.documentElement.classList.toggle('pink', nextTheme === 'pink')
+      setResolvedTheme(nextTheme)
     }
 
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      applyTheme(mediaQuery.matches)
-      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches)
+      applyTheme(mediaQuery.matches ? 'dark' : 'light')
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches ? 'dark' : 'light')
       mediaQuery.addEventListener('change', handler)
+      return () => mediaQuery.removeEventListener('change', handler)
     } else {
-      applyTheme(theme === 'dark')
+      applyTheme(theme)
     }
   }, [theme])
 
   const toggleTheme = useCallback(() => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark')
+    setTheme(prev => prev === 'dark' ? 'light' : prev === 'light' ? 'pink' : 'dark')
   }, [])
 
   const socketRef = useRef<WebSocket | null>(null)
