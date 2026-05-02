@@ -10,7 +10,7 @@ export default {
       fontFamily: {
         display: ['"IBM Plex Mono"', 'monospace'],
         serif: ['"Cormorant Garamond"', 'serif'],
-        sans: ['system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
         surface: 'var(--bg-primary)',
@@ -25,6 +25,7 @@ export default {
         'fade-in': 'fadeIn 0.4s ease-out forwards',
         'slide-in-left': 'slideInLeft 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         'scale-in': 'scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+        'tab-enter': 'tabEnter 240ms cubic-bezier(0.16, 1, 0.3, 1) both',
       },
       keyframes: {
         fadeInUp: {
@@ -42,6 +43,10 @@ export default {
         scaleIn: {
           '0%': { opacity: '0', transform: 'scale(0.95)' },
           '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        tabEnter: {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
       },
     },

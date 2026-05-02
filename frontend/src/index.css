@@ -1,15 +1,120 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import './styles/tokens.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --chart-cpu: #6366f1;
+  --chart-memory: #10b981;
+  --chart-io: #ec4899;
+  --chart-io-fill: rgba(236, 72, 153, 0.26);
+  --chart-health: #c084fc;
+  --chart-health-fill: rgba(192, 132, 252, 0.22);
+}
+
+@layer components {
+  .app-surface {
+    @apply min-h-screen bg-[#f9fafb] text-[#111827] dark:bg-[#0b1120] dark:text-[#e5e7eb];
+    background-image:
+      radial-gradient(circle at 14% 8%, rgba(37, 99, 235, 0.12), transparent 30%),
+      radial-gradient(circle at 88% 0%, rgba(79, 70, 229, 0.10), transparent 28%);
+  }
+
+  .dashboard-card {
+    @apply rounded-lg border border-[#e5e7eb] bg-white p-5 text-[#111827] shadow-lg shadow-slate-200/70 backdrop-blur dark:border-[#1f2937] dark:bg-[#111827]/90 dark:text-[#e5e7eb] dark:shadow-black/25;
+  }
+
+  .app-header {
+    @apply sticky top-0 z-20 border-b border-[#e5e7eb] bg-white px-4 py-3 text-[#111827] shadow-sm shadow-slate-200/50 transition-[margin] duration-300 dark:border-[#374151] dark:bg-[#0b1120] dark:text-[#e5e7eb] dark:shadow-black/20 lg:ml-20;
+  }
+
+  .app-sidebar {
+    @apply fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[#e5e7eb] bg-white shadow-2xl shadow-slate-200/50 transition-[width,transform] duration-300 dark:border-[#374151] dark:bg-[#0b1120] dark:shadow-black/30 lg:w-20 lg:hover:w-72;
+  }
+
+  .app-main {
+    @apply relative px-4 py-6 transition-[margin] duration-300 sm:px-6 lg:ml-20 lg:px-8;
+  }
+
+  .theme-input {
+    @apply w-full rounded-lg border border-[#e5e7eb] bg-white text-[#111827] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-blue-500/10 dark:border-[#374151] dark:bg-[#111827] dark:text-[#e5e7eb];
+  }
+
+  .chart-card {
+    background:
+      radial-gradient(circle at 18% 0%, rgba(37, 99, 235, 0.14), transparent 32%),
+      radial-gradient(circle at 88% 12%, rgba(79, 70, 229, 0.12), transparent 28%),
+      var(--card-bg);
+  }
+
+  .stat-card {
+    @apply min-h-36 transition duration-200 hover:-translate-y-0.5 hover:border-[#3b82f6]/50 hover:brightness-105;
+  }
+
+  .action-button {
+    @apply inline-flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition duration-200 hover:-translate-y-0.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1120] sm:w-auto;
+  }
+
+  .action-button-neutral {
+    @apply border-[#e5e7eb] bg-white text-[#111827] hover:border-[#3b82f6]/50 hover:bg-blue-50 dark:border-[#1f2937] dark:bg-[#1f2937] dark:text-[#e5e7eb] dark:hover:bg-[#263449];
+  }
+
+  .action-button-restart {
+    @apply border-orange-400/40 bg-orange-500 text-white hover:bg-orange-400 focus-visible:ring-orange-400;
+  }
+
+  .action-button-pause {
+    @apply border-amber-300/40 bg-amber-500 text-slate-950 hover:bg-amber-400 focus-visible:ring-amber-400;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#2563eb] via-[#3b82f6] to-[#4f46e5] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5 text-sm font-semibold text-[#111827] transition duration-200 hover:-translate-y-0.5 hover:border-[#3b82f6]/50 hover:bg-blue-50 active:scale-[0.98] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[#1f2937] dark:bg-[#1f2937] dark:text-[#e5e7eb] dark:hover:bg-[#263449];
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-[#ef4444] px-4 py-2.5 text-sm font-semibold text-white transition duration-200 hover:-translate-y-0.5 hover:brightness-110 active:scale-[0.98] disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .tab-button {
+    @apply relative inline-flex shrink-0 items-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold text-[#6b7280] transition duration-200 hover:bg-blue-50 hover:text-[#2563eb] active:scale-[0.98] dark:text-[#9ca3af] dark:hover:bg-white/[0.06] dark:hover:text-[#e5e7eb];
+  }
+
+  .tab-button-active {
+    @apply bg-blue-500/10 text-[#2563eb] shadow-inner shadow-blue-500/10 ring-1 ring-blue-400/30 dark:text-blue-200;
+  }
+
+  .tab-panel {
+    @apply animate-tab-enter;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1;
+  }
+
+  .status-badge-running {
+    @apply bg-emerald-400/10 text-emerald-300 ring-emerald-400/25;
+  }
+
+  .status-badge-stopped {
+    @apply bg-rose-400/10 text-rose-300 ring-rose-400/25;
+  }
+
+  .icon-action {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-md transition duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed;
+  }
+}
+
 /* Base styles using design tokens */
 body {
-  background-color: var(--surface-base);
-  color: var(--text-primary);
-  font-family: 'IBM Plex Mono', monospace;
+  background-color: #f9fafb;
+  color: #111827;
+  font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -19,18 +124,191 @@ body {
   color-scheme: dark;
 }
 
-/* Ensure proper background for dark mode */
-.dark body,
-.bg-gray-900,
-.bg-gray-800 {
-  background-color: var(--surface-base) !important;
+.dark body {
+  background-color: #0b1120;
+  color: #e5e7eb;
 }
 
-/* Ensure text colors use design tokens */
-.text-white,
+.pink {
+  color-scheme: light;
+}
+
+.pink body {
+  background-color: #ffe4ec;
+  color: #2f1234;
+}
+
+.pink {
+  --chart-cpu: #ff2d7a;
+  --chart-memory: #d946ef;
+  --chart-io: #ff1493;
+  --chart-io-fill: rgba(255, 20, 147, 0.30);
+  --chart-health: #c084fc;
+  --chart-health-fill: rgba(192, 132, 252, 0.28);
+}
+
+.pink .app-surface {
+  background-color: #ffe4ec;
+  color: #2f1234;
+  background-image:
+    radial-gradient(circle at 14% 8%, rgba(255, 45, 122, 0.24), transparent 31%),
+    radial-gradient(circle at 88% 0%, rgba(217, 70, 239, 0.20), transparent 30%),
+    linear-gradient(135deg, #ffe4ec 0%, #fff0f6 48%, #fae8ff 100%);
+}
+
+.pink .dashboard-card,
+.pink .app-sidebar,
+.pink .app-header {
+  border-color: #f9a8d4 !important;
+  background:
+    linear-gradient(135deg, rgba(255, 240, 246, 0.96), rgba(255, 228, 236, 0.88)) !important;
+  color: #2f1234 !important;
+  box-shadow: 0 18px 42px rgba(255, 20, 147, 0.16) !important;
+}
+
+.pink .chart-card {
+  background:
+    radial-gradient(circle at 18% 0%, rgba(255, 45, 122, 0.22), transparent 34%),
+    radial-gradient(circle at 88% 12%, rgba(217, 70, 239, 0.18), transparent 30%),
+    linear-gradient(135deg, rgba(255, 240, 246, 0.98), rgba(255, 228, 236, 0.92)) !important;
+}
+
+.pink .theme-input {
+  border-color: #f9a8d4 !important;
+  background-color: #fff0f6 !important;
+  color: #2f1234 !important;
+}
+
+.pink .login-page {
+  background-color: #ffe4ec !important;
+  color: #2f1234 !important;
+}
+
+.pink .login-gradient {
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 45, 122, 0.30), transparent 30%),
+    radial-gradient(circle at 82% 8%, rgba(217, 70, 239, 0.26), transparent 28%),
+    linear-gradient(135deg, #ffe4ec, #fff0f6 48%, #fae8ff) !important;
+}
+
+.pink .login-card {
+  border-color: rgba(249, 168, 212, 0.94) !important;
+  background: linear-gradient(135deg, rgba(255, 240, 246, 0.86), rgba(255, 228, 236, 0.76)) !important;
+  color: #2f1234 !important;
+  box-shadow: 0 30px 70px rgba(255, 20, 147, 0.22) !important;
+}
+
+.pink .login-page h1,
+.pink .login-page h2,
+.pink .login-page label {
+  color: #2f1234 !important;
+}
+
+.pink .login-page p {
+  color: #7c2d57 !important;
+}
+
+.pink .login-page input {
+  border-color: #f9a8d4 !important;
+  background-color: rgba(255, 240, 246, 0.90) !important;
+  color: #2f1234 !important;
+}
+
+.pink .bg-blue-600,
+.pink .bg-blue-500,
+.pink .bg-gradient-to-r {
+  background-image: linear-gradient(90deg, #ff2d7a, #ff1493, #d946ef) !important;
+}
+
+.pink .btn-primary,
+.pink .tab-button-active {
+  background-image: linear-gradient(90deg, #ff2d7a, #d946ef) !important;
+  color: #ffffff !important;
+}
+
+.pink .btn-secondary,
+.pink .action-button-neutral {
+  border-color: #f9a8d4 !important;
+  background-color: #fff0f6 !important;
+  color: #7c2d57 !important;
+}
+
+.pink .tab-button {
+  color: #7c2d57 !important;
+}
+
+.pink .tab-button:hover {
+  background-color: rgba(255, 45, 122, 0.10) !important;
+  color: #ff1493 !important;
+}
+
+.pink .text-blue-500,
+.pink .text-indigo-300,
+.pink .text-blue-300 {
+  color: #ff1493 !important;
+}
+
+@media (min-width: 1024px) {
+  .lg\:ml-72 {
+    margin-left: 5rem !important;
+  }
+}
+
+/* Legacy Tailwind aliases mapped to the dashboard color system */
+.bg-gray-900 { background-color: #f9fafb !important; color: #111827 !important; }
+.bg-gray-800 { background-color: #ffffff !important; color: #111827 !important; }
+.bg-gray-700 { background-color: #f3f4f6 !important; color: #111827 !important; }
+.bg-gray-600 { background-color: #e5e7eb !important; color: #111827 !important; }
+.dark .bg-gray-900 { background-color: #0b1120 !important; color: #e5e7eb !important; }
+.dark .bg-gray-800 { background-color: #111827 !important; color: #e5e7eb !important; }
+.dark .bg-gray-700 { background-color: #1f2937 !important; color: #e5e7eb !important; }
+.dark .bg-gray-600 { background-color: #374151 !important; color: #e5e7eb !important; }
+.bg-blue-600 { background-image: linear-gradient(90deg, #2563eb, #4f46e5) !important; color: #fff !important; }
+.bg-blue-500 { background-color: #3b82f6 !important; color: #fff !important; }
+.bg-green-600 { background-color: #22c55e !important; color: #052e16 !important; }
+.bg-yellow-600 { background-color: #f59e0b !important; color: #111827 !important; }
+.bg-red-600 { background-color: #ef4444 !important; color: #fff !important; }
+.bg-red-500 { background-color: #ef4444 !important; color: #fff !important; }
+.border-gray-700,
+.border-gray-600,
+.border-gray-800 { border-color: #e5e7eb !important; }
+.dark .border-gray-700,
+.dark .border-gray-600,
+.dark .border-gray-800 { border-color: #1f2937 !important; }
+.text-white { color: #111827 !important; }
+.dark .text-white { color: #e5e7eb !important; }
+.bg-blue-600.text-white,
+.bg-blue-500.text-white,
+.bg-red-600.text-white,
+.bg-red-500.text-white,
+.bg-gradient-to-r.text-white,
+.bg-gradient-to-br.text-white {
+  color: #ffffff !important;
+}
 .text-gray-300,
-.text-gray-400 {
-  color: var(--text-primary) !important;
+.text-gray-400 { color: #6b7280 !important; }
+.text-gray-500 { color: #9ca3af !important; }
+.dark .text-gray-300,
+.dark .text-gray-400 { color: #9ca3af !important; }
+.dark .text-gray-500 { color: #6b7280 !important; }
+
+.tracking-tight,
+.tracking-wide,
+.tracking-wider,
+.tracking-widest,
+[class*="tracking-"] {
+  letter-spacing: 0 !important;
+}
+
+.tab-button-active::after {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.25rem;
+  left: 0.75rem;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, #2563eb, #4f46e5);
+  content: "";
 }
 
 /* Focus styles */
@@ -56,13 +334,6 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-tertiary);
-}
-
-/* Border color fixes */
-.border-gray-700,
-.border-gray-600,
-.border-gray-800 {
-  border-color: var(--border-default) !important;
 }
 
 /* Reduced motion */
