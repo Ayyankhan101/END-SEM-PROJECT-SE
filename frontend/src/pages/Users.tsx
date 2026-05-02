@@ -41,8 +41,10 @@ function Users() {
     try {
       const data = await api.getUsers()
       setUsers(data)
+      setLoading(false)
     } catch (err) {
       console.error('Failed to fetch users:', err)
+      setLoading(false)
     }
   }
 
