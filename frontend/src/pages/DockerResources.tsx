@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Layers, X } from 'lucide-react'
+import { Box, Database, Layers, Network, X } from 'lucide-react'
 import api from '@/services/api'
 import type { DockerImage, DockerVolume, DockerNetwork } from '@/types'
 import { formatSize } from '../utils/format'
+import Header from '@/components/Header'
+import { useAuth } from '@/App'
 
 type Tab = 'images' | 'volumes' | 'networks'
 
 export default function DockerResources() {
+  const { isConnected, logout } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('images')
   const [images, setImages] = useState<DockerImage[]>([])
   const [volumes, setVolumes] = useState<DockerVolume[]>([])
@@ -146,61 +149,70 @@ export default function DockerResources() {
     })
   }
 
-  const tabs: Tab[] = ['images', 'volumes', 'networks']
+  const tabs: { id: Tab; label: string; icon: JSX.Element }[] = [
+    { id: 'images', label: 'Images', icon: <Box className="h-4 w-4" /> },
+    { id: 'volumes', label: 'Volumes', icon: <Database className="h-4 w-4" /> },
+    { id: 'networks', label: 'Networks', icon: <Network className="h-4 w-4" /> }
+  ]
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Docker Resources</h1>
+    <div className="app-surface">
+      <Header title="Docker Resources" icon={<Layers size={24} />} isConnected={isConnected} onLogout={logout} />
+      <main className="px-4 py-6 sm:px-6 lg:ml-72 lg:px-8">
+      <section className="dashboard-card mb-6">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-300">Resource inventory</p>
+        <h1 className="mt-2 text-2xl font-semibold">Docker Resources</h1>
+        <p className="mt-1 text-sm text-[#94a3b8]">Manage local images, persistent volumes, and Docker networks.</p>
+      </section>
 
       {error && (
-        <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded mb-4">
+        <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-red-200">
           {error}
         </div>
       )}
 
-      <div className="flex gap-2 mb-6">
+      <div className="dashboard-card mb-6 flex gap-2 overflow-x-auto p-2">
         {tabs.map(tab => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded ${
-              activeTab === tab ? 'bg-blue-600' : 'bg-gray-800'
-            }`}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`tab-button ${activeTab === tab.id ? 'tab-button-active' : ''}`}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab.icon}
+            {tab.label}
           </button>
         ))}
       </div>
 
       {activeTab === 'images' && (
-        <div className="mb-4">
+        <div className="tab-panel mb-4">
           <button
             onClick={() => setShowPullForm(!showPullForm)}
-            className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+            className={showPullForm ? 'btn-secondary' : 'btn-primary'}
           >
             {showPullForm ? 'Cancel' : 'Pull Image'}
           </button>
 
           {showPullForm && (
-            <div className="mt-4 bg-gray-800 rounded p-4">
+            <div className="dashboard-card mt-4 flex flex-col gap-3 md:flex-row">
               <input
                 type="text"
                 placeholder="Image name"
                 value={pullData.imageName}
                 onChange={e => setPullData(d => ({ ...d, imageName: e.target.value }))}
-                className="bg-gray-900 border border-gray-700 rounded px-3 py-2 mr-2"
+                className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-[#111827] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#3b82f6]/15 dark:border-[#1f2937] dark:bg-[#0b1120]/70 dark:text-[#e5e7eb]"
               />
               <input
                 type="text"
                 placeholder="Tag"
                 value={pullData.tag}
                 onChange={e => setPullData(d => ({ ...d, tag: e.target.value }))}
-                className="bg-gray-900 border border-gray-700 rounded px-3 py-2 mr-2 w-24"
+                className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-2 text-[#111827] outline-none transition focus:border-[#2563eb] focus:ring-4 focus:ring-[#3b82f6]/15 dark:border-[#1f2937] dark:bg-[#0b1120]/70 dark:text-[#e5e7eb] md:w-28"
               />
               <button
                 onClick={handlePull}
                 disabled={pulling || !pullData.imageName}
-                className="px-4 py-2 bg-blue-600 rounded disabled:opacity-50"
+                className="btn-primary"
               >
                 {pulling ? 'Pulling...' : 'Pull'}
               </button>
@@ -210,9 +222,9 @@ export default function DockerResources() {
       )}
 
       {loading ? (
-        <div className="text-gray-400">Loading...</div>
+        <div className="dashboard-card text-[#94a3b8]">Loading...</div>
       ) : activeTab === 'images' ? (
-        <div>
+        <div className="tab-panel">
           {selectedImages.size > 0 && (
             <div className="mb-4 flex items-center gap-4">
               <span className="text-gray-400">{selectedImages.size} selected</span>
@@ -291,7 +303,7 @@ export default function DockerResources() {
           </div>
         </div>
       ) : activeTab === 'volumes' ? (
-        <div className="grid gap-4">
+        <div className="tab-panel grid gap-4">
           {volumes.length === 0 ? (
             <div className="text-gray-400">No volumes found</div>
           ) : (
@@ -316,7 +328,7 @@ export default function DockerResources() {
           )}
         </div>
       ) : (
-        <div className="grid gap-4">
+        <div className="tab-panel grid gap-4">
           {networks.length === 0 ? (
             <div className="text-gray-400">No networks found</div>
           ) : (
@@ -421,6 +433,7 @@ export default function DockerResources() {
           </div>
         </div>
       )}
+      </main>
     </div>
   )
 }
