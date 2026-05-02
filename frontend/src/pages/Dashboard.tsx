@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
@@ -29,6 +30,8 @@ import {
 } from 'lucide-react'
 import ContainerCard from '@/components/ContainerCard'
 import Header from '@/components/Header'
+import DashboardCharts from '@/components/DashboardCharts'
+import ThreeLoginBackground from '@/components/ThreeLoginBackground'
 import type { Container as ContainerType } from '@/types'
 
 interface Stats {
@@ -36,6 +39,33 @@ interface Stats {
   running: number;
   stopped: number;
   alerts: number;
+}
+
+interface DashboardMetricCardProps {
+  label: string;
+  value: string | number;
+  detail: string;
+  icon: ReactNode;
+  accent: string;
+  action?: ReactNode;
+}
+
+function DashboardMetricCard({ label, value, detail, icon, accent, action }: DashboardMetricCardProps) {
+  return (
+    <div className="dashboard-card stat-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className={`flex h-11 w-11 items-center justify-center rounded-lg border ${accent}`}>
+          {icon}
+        </div>
+        {action}
+      </div>
+      <div className="mt-5">
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
+        <p className="mt-1 text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{value}</p>
+        <p className="mt-2 text-xs text-[#6b7280] dark:text-[#9ca3af]">{detail}</p>
+      </div>
+    </div>
+  )
 }
 
 function Dashboard() {
@@ -181,7 +211,10 @@ const avgCpuRaw = (
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="app-surface relative overflow-hidden">
+      <div className="pointer-events-none fixed inset-0 z-0 opacity-[0.09] dark:opacity-[0.12] pink:opacity-[0.08]">
+        <ThreeLoginBackground />
+      </div>
       <Header 
         title="Dashboard" 
         icon={<Container size={24} />} 
@@ -190,73 +223,91 @@ const avgCpuRaw = (
         onLogout={logout}
       />
 
-      <div className="p-6">
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <div className="flex items-center gap-3">
+      <main className="app-main z-10">
+        <section className="dashboard-card mb-6 flex flex-col gap-4 overflow-hidden">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className="hidden h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-500 sm:flex">
+                <Layers className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-500">Operations overview</p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#111827] dark:text-[#e5e7eb]">Container fleet</h2>
+                <p className="mt-1 text-sm text-[#6b7280] dark:text-[#d1d5db]">Search, filter, and operate Docker containers from one workspace.</p>
+              </div>
+            </div>
+            <Link
+              to="/containers/new"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-blue-500 to-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/15 transition hover:-translate-y-0.5"
+            >
+              <Plus className="h-4 w-4" />
+              New Container
+            </Link>
+          </div>
+        </section>
+
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <DashboardMetricCard
+            label="Total Containers"
+            value={stats.total}
+            detail={`${filteredContainers.length} visible after filters`}
+            icon={<Activity className="h-5 w-5" />}
+            accent="border-blue-500/25 bg-blue-500/10 text-blue-500"
+            action={
               <button
                 onClick={toggleSelectAll}
-                className="p-1 hover:bg-gray-700 rounded"
+                className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-blue-500 dark:hover:bg-white/10"
                 title="Select all"
               >
                 {selectedIds.size === filteredContainers.length && filteredContainers.length > 0 ? (
-                  <CheckSquare className="w-5 h-5 text-blue-500" />
+                  <CheckSquare className="h-5 w-5 text-blue-500" />
                 ) : (
-                  <SquareIcon className="w-5 h-5 text-gray-500" />
+                  <SquareIcon className="h-5 w-5" />
                 )}
               </button>
-              <Activity className="w-8 h-8 text-blue-500" />
-              <div>
-                <p className="text-2xl font-bold">{stats.total}</p>
-                <p className="text-gray-400 text-sm">Total Containers</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Container className="w-8 h-8 text-green-500" />
-              <div>
-                <p className="text-2xl font-bold">{stats.running}</p>
-                <p className="text-gray-400 text-sm">Running</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <div className="flex items-center gap-3">
-              <HardDrive className="w-8 h-8 text-red-500" />
-              <div>
-                <p className="text-2xl font-bold">{stats.stopped}</p>
-                <p className="text-gray-400 text-sm">Stopped</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Cpu className="w-8 h-8 text-purple-500" />
-              <div>
-                <p className="text-2xl font-bold">{avgCpu}%</p>
-                <p className="text-gray-400 text-sm">Avg CPU</p>
-              </div>
-            </div>
-          </div>
+            }
+          />
+          <DashboardMetricCard
+            label="Running"
+            value={stats.running}
+            detail="Containers accepting workload"
+            icon={<Container className="h-5 w-5" />}
+            accent="border-emerald-500/25 bg-emerald-500/10 text-emerald-500"
+          />
+          <DashboardMetricCard
+            label="Stopped"
+            value={stats.stopped}
+            detail="Exited, paused, or unavailable"
+            icon={<HardDrive className="h-5 w-5" />}
+            accent="border-red-500/25 bg-red-500/10 text-red-500"
+          />
+          <DashboardMetricCard
+            label="Avg CPU"
+            value={`${avgCpu}%`}
+            detail="Average across known samples"
+            icon={<Cpu className="h-5 w-5" />}
+            accent="border-violet-500/25 bg-violet-500/10 text-violet-500"
+          />
         </div>
 
-        <div className="mb-6">
-          <div className="flex gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <DashboardCharts containers={Array.isArray(containers) ? containers : []} />
+
+        <div className="dashboard-card mb-6">
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search by name, id, image, status..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 pl-10 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="theme-input py-2.5 pl-10 pr-4 text-sm"
               />
             </div>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-gray-800 border border-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="theme-input px-4 py-2.5 text-sm"
             >
               <option value="all">All Status</option>
               <option value="running">Running</option>
@@ -267,7 +318,7 @@ const avgCpuRaw = (
             <select
               value={groupFilter}
               onChange={(e) => setGroupFilter(e.target.value)}
-              className="bg-gray-800 border border-gray-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="theme-input px-4 py-2.5 text-sm"
             >
               <option value="all">All Groups</option>
               <option value="web">Web</option>
@@ -282,24 +333,24 @@ const avgCpuRaw = (
             </select>
             <button
               onClick={() => setFavoritesOnly(!favoritesOnly)}
-              className={`px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              className={`rounded-lg px-4 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-blue-500/10 ${
                 favoritesOnly 
-                  ? 'bg-yellow-600 hover:bg-yellow-500 text-white' 
-                  : 'bg-gray-800 border border-gray-700 text-gray-300 hover:bg-gray-700'
+                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20 hover:bg-amber-400' 
+                  : 'border border-[#e5e7eb] bg-white text-[#6b7280] hover:bg-blue-50 hover:text-[#111827] dark:border-[#374151] dark:bg-[#111827] dark:text-[#d1d5db] dark:hover:bg-[#1f2937]'
               }`}
             >
-              ★ Favorites
+              Favorites
             </button>
           </div>
         </div>
 
         {selectedIds.size > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-800 border border-gray-600 rounded-lg p-4 shadow-xl flex items-center gap-4 z-50">
-            <span className="text-sm text-gray-300">{selectedIds.size} selected</span>
+          <div className="fixed bottom-6 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 flex-wrap items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white/92 p-3 shadow-2xl shadow-slate-300/50 backdrop-blur dark:border-white/10 dark:bg-slate-900/92 dark:shadow-black/40 lg:left-[calc(50%+9rem)]">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{selectedIds.size} selected</span>
             <button
               onClick={handleBulkStart}
               disabled={bulkLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-500 rounded text-sm disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-500 transition hover:bg-emerald-500/20 disabled:opacity-50"
             >
               <Play className="w-4 h-4" />
               Start
@@ -307,7 +358,7 @@ const avgCpuRaw = (
             <button
               onClick={handleBulkStop}
               disabled={bulkLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-yellow-600 hover:bg-yellow-500 rounded text-sm disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-500 transition hover:bg-amber-500/20 disabled:opacity-50"
             >
               <Square className="w-4 h-4" />
               Stop
@@ -315,7 +366,7 @@ const avgCpuRaw = (
             <button
               onClick={handleBulkRestart}
               disabled={bulkLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-orange-500/10 px-3 py-2 text-sm font-semibold text-orange-500 transition hover:bg-orange-500/20 disabled:opacity-50"
             >
               <RotateCw className="w-4 h-4" />
               Restart
@@ -323,7 +374,7 @@ const avgCpuRaw = (
             <button
               onClick={() => setShowDeleteModal(true)}
               disabled={bulkLoading}
-              className="flex items-center gap-2 px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded text-sm disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-red-500/10 px-3 py-2 text-sm font-semibold text-red-500 transition hover:bg-red-500/20 disabled:opacity-50"
             >
               <Trash2 className="w-4 h-4" />
               Delete
@@ -332,9 +383,13 @@ const avgCpuRaw = (
         )}
 
         {loading ? (
-          <div className="text-center py-12 text-gray-400">Loading containers...</div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((item) => (
+              <div key={item} className="h-48 animate-pulse rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-white/[0.04]" />
+            ))}
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 container-scroll">
+          <div className="container-scroll grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {filteredContainers.map(container => (
               <ContainerCard 
                 key={container.id} 
@@ -347,29 +402,29 @@ const avgCpuRaw = (
         )}
 
         {!loading && filteredContainers.length === 0 && (
-          <div className="text-center py-12 text-gray-400">
+          <div className="dashboard-card py-12 text-center text-slate-500">
             No containers found
           </div>
         )}
 
         {showDeleteModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-gray-800 p-6 rounded-lg max-w-md">
-              <h3 className="text-lg font-bold mb-4">Confirm Bulk Delete</h3>
-              <p className="text-gray-400 mb-6">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+            <div className="max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-slate-900">
+              <h3 className="mb-4 text-lg font-bold">Confirm Bulk Delete</h3>
+              <p className="mb-6 text-slate-500 dark:text-slate-400">
                 Are you sure you want to delete {selectedIds.size} container(s)? This action cannot be undone.
               </p>
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-slate-600 transition hover:bg-slate-100 dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleBulkDelete}
                   disabled={bulkLoading}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded disabled:opacity-50"
+                  className="rounded-lg bg-red-500 px-4 py-2 font-semibold text-white transition hover:bg-red-400 disabled:opacity-50"
                 >
                   {bulkLoading ? 'Deleting...' : 'Delete'}
                 </button>
@@ -377,7 +432,7 @@ const avgCpuRaw = (
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }

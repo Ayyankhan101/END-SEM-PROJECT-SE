@@ -1,15 +1,43 @@
 import { useEffect, useState, useCallback } from 'react'
+import type { ReactNode } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
-import { ArrowLeft, Play, Pause, RotateCw, Cpu, HardDrive, FileText, Terminal as TerminalIcon, Network, Settings as SettingsIcon, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Play, Pause, RotateCw, Cpu, HardDrive, FileText, Terminal as TerminalIcon, Network, Settings as SettingsIcon, Plus, Trash2, Activity, Box, CheckCircle2, Clock3 } from 'lucide-react'
 import MetricsChart from '@/components/MetricsChart'
 import LogViewer from '@/components/LogViewer'
+import Header from '@/components/Header'
 import type { ContainerDetail as ContainerDetailType, Metric } from '@/types'
+
+interface StatCardProps {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  accent: string;
+  detail?: string;
+}
+
+function StatCard({ icon, label, value, accent, detail }: StatCardProps) {
+  return (
+    <div className="dashboard-card stat-card group">
+      <div className="flex items-center justify-between gap-4">
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border ${accent}`}>
+          {icon}
+        </div>
+        <div className="h-9 w-16 rounded-full bg-white/[0.03] blur-xl transition group-hover:bg-white/[0.06]" />
+      </div>
+      <div className="mt-5">
+        <p className="text-sm font-medium text-slate-400">{label}</p>
+        <p className="mt-1 text-2xl font-semibold tracking-tight text-white">{value}</p>
+        {detail && <p className="mt-2 text-xs text-slate-500">{detail}</p>}
+      </div>
+    </div>
+  )
+}
 
 function ContainerDetail() {
   const { id } = useParams<{ id: string }>()
-  const { socket } = useAuth()
+  const { socket, logout, isConnected } = useAuth()
   const [container, setContainer] = useState<ContainerDetailType | null>(null)
   const [metrics, setMetrics] = useState<Metric[]>([])
   const [loading, setLoading] = useState<boolean>(true)
@@ -95,7 +123,32 @@ function ContainerDetail() {
   }
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-900 text-white p-6">Loading...</div>
+    return (
+      <div className="min-h-screen bg-slate-950 p-6 text-white">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <div className="h-5 w-40 animate-pulse rounded bg-white/10" />
+          <div className="dashboard-card">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="space-y-4">
+                <div className="h-10 w-72 animate-pulse rounded bg-white/10" />
+                <div className="h-4 w-96 max-w-full animate-pulse rounded bg-white/10" />
+              </div>
+              <div className="flex gap-3">
+                <div className="h-10 w-28 animate-pulse rounded-lg bg-white/10" />
+                <div className="h-10 w-28 animate-pulse rounded-lg bg-white/10" />
+                <div className="h-10 w-28 animate-pulse rounded-lg bg-white/10" />
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="h-36 animate-pulse rounded-lg bg-white/10" />
+            <div className="h-36 animate-pulse rounded-lg bg-white/10" />
+            <div className="h-36 animate-pulse rounded-lg bg-white/10" />
+          </div>
+          <div className="h-96 animate-pulse rounded-lg bg-white/10" />
+        </div>
+      </div>
+    )
   }
 
   if (!container) {
@@ -104,134 +157,118 @@ function ContainerDetail() {
 
   const isRunning = container.status === 'running'
   const currentMetrics = Array.isArray(metrics) ? metrics : []
+  const latestMetric = currentMetrics[currentMetrics.length - 1]
+  const currentCpu = latestMetric?.cpu_percent ?? 0
+  const currentMemory = latestMetric?.memory_percent ?? 0
+  const shortContainerId = container.id?.slice(0, 12) || containerId.slice(0, 12)
+  const lastUpdated = latestMetric?.timestamp
+    ? new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    }).format(new Date(latestMetric.timestamp))
+    : 'Waiting for live data'
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: <Activity className="h-4 w-4" /> },
+    { id: 'logs', label: 'Logs', icon: <FileText className="h-4 w-4" /> },
+    { id: 'ports', label: 'Ports', icon: <Network className="h-4 w-4" /> },
+    { id: 'env', label: 'Environment', icon: <SettingsIcon className="h-4 w-4" /> }
+  ]
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <div className="p-6">
-        <Link to="/" className="flex items-center gap-2 text-gray-400 hover:text-white mb-6">
+    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-white">
+      <Header
+        title="Container Details"
+        icon={<Box size={24} />}
+        isConnected={isConnected}
+        onLogout={logout}
+      />
+      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:ml-72 lg:px-8">
+        <Link to="/" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-400 transition hover:text-white">
           <ArrowLeft className="w-4 h-4" />
           Back to Dashboard
         </Link>
 
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">{container.name}</h1>
-            <p className="text-gray-400 font-mono text-sm">{container.id}</p>
-            <p className="text-gray-500 text-sm">{container.image}</p>
+        <section className="dashboard-card mb-6 overflow-hidden">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-cyan-400/20 bg-cyan-400/10 text-cyan-300">
+                  <Box className="h-6 w-6" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h1 className="truncate text-2xl font-semibold tracking-tight text-white sm:text-3xl">{container.name}</h1>
+                    <span className={`status-badge ${isRunning ? 'status-badge-running' : 'status-badge-stopped'}`}>
+                      <span className="h-2 w-2 rounded-full bg-current" />
+                      {container.status}
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate text-sm text-slate-400">{container.image}</p>
+                </div>
+              </div>
+              <div className="mt-5 grid gap-3 text-xs text-slate-400 sm:grid-cols-2">
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  <span className="block text-slate-500">Container ID</span>
+                  <span className="font-mono text-slate-200">{shortContainerId}</span>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2">
+                  <span className="block text-slate-500">Last sample</span>
+                  <span className="font-mono text-slate-200">{lastUpdated}</span>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right dark:border-white/10 dark:bg-white/[0.03]">
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">Samples</p>
+              <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{currentMetrics.length}</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              to={`/container/${id}/terminal`}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
-            >
-              <TerminalIcon className="w-4 h-4" />
-              Terminal
-            </Link>
-            <button
-              onClick={handleRestart}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
-            >
-              <RotateCw className="w-4 h-4" />
-              Restart
-            </button>
-            <button
-              onClick={handlePause}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
-            >
-              {isRunning ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-              {isRunning ? 'Pause' : 'Resume'}
-            </button>
-          </div>
+        </section>
+
+        <div className="mb-6 grid gap-4 md:grid-cols-3">
+          <StatCard
+            icon={<Cpu className="h-5 w-5" />}
+            label="CPU Usage"
+            value={`${currentCpu.toFixed(1)}%`}
+            detail="Latest container sample"
+            accent="border-indigo-400/25 bg-indigo-400/10 text-indigo-300"
+          />
+          <StatCard
+            icon={<HardDrive className="h-5 w-5" />}
+            label="Memory Usage"
+            value={`${currentMemory.toFixed(1)}%`}
+            detail="Latest container sample"
+            accent="border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
+          />
+          <StatCard
+            icon={isRunning ? <CheckCircle2 className="h-5 w-5" /> : <Clock3 className="h-5 w-5" />}
+            label="Runtime Status"
+            value={container.status}
+            detail={isRunning ? 'Accepting live metrics' : 'Metrics may be paused'}
+            accent={isRunning ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' : 'border-rose-400/25 bg-rose-400/10 text-rose-300'}
+          />
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <div className="flex items-center gap-3">
-              <Cpu className="w-8 h-8 text-blue-500" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {currentMetrics.length > 0 ? (currentMetrics[currentMetrics.length-1]?.cpu_percent || 0).toFixed(1) : 0}%
-                </p>
-                <p className="text-gray-400 text-sm">CPU Usage</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <div className="flex items-center gap-3">
-              <HardDrive className="w-8 h-8 text-green-500" />
-              <div>
-                <p className="text-2xl font-bold">
-                  {currentMetrics.length > 0 ? (currentMetrics[currentMetrics.length-1]?.memory_percent || 0).toFixed(1) : 0}%
-                </p>
-                <p className="text-gray-400 text-sm">Memory Usage</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-gray-800 p-4 rounded-lg">
-            <div className="flex items-center gap-3">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isRunning ? 'bg-green-500' : 'bg-red-500'}`}>
-                {isRunning ? '●' : '○'}
-              </div>
-              <div>
-                <p className="text-xl font-bold capitalize">{container.status}</p>
-                <p className="text-gray-400 text-sm">Status</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <div className="flex items-center justify-between border-b border-gray-700">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab('overview')}
-                className={`px-4 py-2 text-sm font-medium ${
-                  activeTab === 'overview'
-                    ? 'text-blue-500 border-b-2 border-blue-500'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => setActiveTab('logs')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${
-                  activeTab === 'logs'
-                    ? 'text-blue-500 border-b-2 border-blue-500'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <FileText className="w-4 h-4" />
-                Logs
-              </button>
-              <button
-                onClick={() => setActiveTab('ports')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${
-                  activeTab === 'ports'
-                    ? 'text-blue-500 border-b-2 border-blue-500'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <Network className="w-4 h-4" />
-                Ports
-              </button>
-              <button
-                onClick={() => setActiveTab('env')}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium ${
-                  activeTab === 'env'
-                    ? 'text-blue-500 border-b-2 border-blue-500'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-              >
-                <SettingsIcon className="w-4 h-4" />
-                Environment
-              </button>
+        <div className="mb-5">
+          <div className="flex flex-col gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex gap-1 overflow-x-auto">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`tab-button ${activeTab === tab.id ? 'tab-button-active' : ''}`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
             </div>
             {activeTab === 'overview' && (
               <select
                 value={timeRange}
                 onChange={(e) => setTimeRange(Number(e.target.value))}
-                className="bg-gray-800 border border-gray-700 text-white text-sm px-3 py-1 rounded"
+                className="rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition focus:border-indigo-400"
               >
                 <option value={1}>Last 1 hour</option>
                 <option value={6}>Last 6 hours</option>
@@ -244,48 +281,56 @@ function ContainerDetail() {
         </div>
 
         {activeTab === 'overview' && (
-          <MetricsChart data={metrics} title={`Resource Usage - Last ${timeRange}h`} />
+          <div className="tab-panel">
+            <MetricsChart data={metrics} title={`Resource Usage - Last ${timeRange}h`} />
+          </div>
         )}
 
         {activeTab === 'logs' && id && (
-          <LogViewer containerId={id} />
+          <div className="tab-panel">
+            <LogViewer containerId={id} />
+          </div>
         )}
 
         {activeTab === 'ports' && (
-          <div className="bg-gray-800 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Port Mappings</h3>
+          <div className="dashboard-card tab-panel">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Networking</p>
+                <h3 className="mt-1 text-lg font-semibold text-white">Port Mappings</h3>
+              </div>
               <button
                 onClick={() => setShowPortModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm"
+                className="action-button action-button-neutral sm:w-auto"
               >
                 <Plus className="w-4 h-4" />
                 Add Port
               </button>
             </div>
             {(container as any)?.network_settings?.Ports && Object.keys((container as any).network_settings.Ports).length > 0 ? (
-              <table className="w-full">
-                <thead className="bg-gray-700">
+              <div className="overflow-x-auto rounded-lg border border-white/10">
+                <table className="w-full min-w-[640px] text-sm">
+                <thead className="bg-white/[0.04] text-slate-400">
                   <tr>
-                    <th className="px-4 py-2 text-left">Container Port</th>
-                    <th className="px-4 py-2 text-left">Host Port</th>
-                    <th className="px-4 py-2 text-left">Protocol</th>
-                    <th className="px-4 py-2 text-left">Status</th>
+                    <th className="px-4 py-3 text-left font-medium">Container Port</th>
+                    <th className="px-4 py-3 text-left font-medium">Host Port</th>
+                    <th className="px-4 py-3 text-left font-medium">Protocol</th>
+                    <th className="px-4 py-3 text-left font-medium">Status</th>
                     <th className="px-4 py-2"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {Object.entries((container as any)?.network_settings?.Ports || {}).map(([port, binding]: [string, any]) => (
-                    <tr key={port} className="border-t border-gray-700">
-                      <td className="px-4 py-2">{port}</td>
-                      <td className="px-4 py-2">{binding?.[0]?.HostPort || '-'}</td>
-                      <td className="px-4 py-2">{port.split('/')[1] || 'tcp'}</td>
-                      <td className="px-4 py-2">
-                        <span className={`px-2 py-1 rounded text-xs ${binding ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400'}`}>
+                    <tr key={port} className="border-t border-white/10 text-slate-200 transition hover:bg-white/[0.03]">
+                      <td className="px-4 py-3 font-mono">{port}</td>
+                      <td className="px-4 py-3 font-mono">{binding?.[0]?.HostPort || '-'}</td>
+                      <td className="px-4 py-3 uppercase text-slate-400">{port.split('/')[1] || 'tcp'}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${binding ? 'bg-emerald-400/10 text-emerald-300 ring-1 ring-emerald-400/20' : 'bg-slate-500/10 text-slate-400 ring-1 ring-slate-500/20'}`}>
                           {binding ? 'Bound' : 'Not Bound'}
                         </span>
                       </td>
-                      <td className="px-4 py-2">
+                      <td className="px-4 py-3 text-right">
                         <button
                           onClick={async () => {
                             const currentPorts = (container as any).network_settings?.Ports || {}
@@ -300,7 +345,7 @@ function ContainerDetail() {
                               console.error('Failed to delete port:', err)
                             }
                           }}
-                          className="p-1 text-red-400 hover:text-red-300"
+                          className="rounded-md p-1.5 text-rose-400 transition hover:bg-rose-400/10 hover:text-rose-300"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -309,30 +354,35 @@ function ContainerDetail() {
                   ))}
                 </tbody>
               </table>
+              </div>
             ) : (
-              <p className="text-gray-400">No ports exposed</p>
+              <p className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-slate-400">No ports exposed</p>
             )}
           </div>
         )}
 
         {activeTab === 'env' && (
-          <div className="bg-gray-800 rounded-lg p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Environment Variables</h3>
+          <div className="dashboard-card tab-panel">
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Configuration</p>
+                <h3 className="mt-1 text-lg font-semibold text-white">Environment Variables</h3>
+              </div>
               <button
                 onClick={() => setShowEnvModal(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-sm"
+                className="action-button action-button-neutral sm:w-auto"
               >
                 <Plus className="w-4 h-4" />
                 Add Variable
               </button>
             </div>
             {(container as any)?.config?.Env ? (
-              <table className="w-full">
-                <thead className="bg-gray-700">
+              <div className="overflow-x-auto rounded-lg border border-white/10">
+                <table className="w-full min-w-[640px] text-sm">
+                <thead className="bg-white/[0.04] text-slate-400">
                   <tr>
-                    <th className="px-4 py-2 text-left">Variable</th>
-                    <th className="px-4 py-2 text-left">Value</th>
+                    <th className="px-4 py-3 text-left font-medium">Variable</th>
+                    <th className="px-4 py-3 text-left font-medium">Value</th>
                     <th className="px-4 py-2"></th>
                   </tr>
                 </thead>
@@ -340,10 +390,10 @@ function ContainerDetail() {
                   {((container as any)?.config?.Env as string[] || []).map((env: string, idx: number) => {
                     const [key, ...valueParts] = env.split('=')
                     return (
-                      <tr key={idx} className="border-t border-gray-700">
-                        <td className="px-4 py-2 font-mono text-blue-400">{key}</td>
-                        <td className="px-4 py-2 font-mono text-gray-300 break-all">{valueParts.join('=')}</td>
-                        <td className="px-4 py-2">
+                      <tr key={idx} className="border-t border-white/10 text-slate-200 transition hover:bg-white/[0.03]">
+                        <td className="px-4 py-3 font-mono text-indigo-300">{key}</td>
+                        <td className="break-all px-4 py-3 font-mono text-slate-300">{valueParts.join('=')}</td>
+                        <td className="px-4 py-3 text-right">
                           <button
                             onClick={async () => {
                               const currentEnv = ((container as any).config?.Env || []).map((e: string) => {
@@ -360,7 +410,7 @@ function ContainerDetail() {
                                 console.error('Failed to delete env:', err)
                               }
                             }}
-                            className="p-1 text-red-400 hover:text-red-300"
+                            className="rounded-md p-1.5 text-rose-400 transition hover:bg-rose-400/10 hover:text-rose-300"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -370,8 +420,9 @@ function ContainerDetail() {
                   })}
                 </tbody>
               </table>
+              </div>
             ) : (
-              <p className="text-gray-400">No environment variables</p>
+              <p className="rounded-lg border border-dashed border-white/10 px-4 py-8 text-center text-slate-400">No environment variables</p>
             )}
           </div>
         )}
@@ -488,7 +539,7 @@ function ContainerDetail() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }
