@@ -48,7 +48,7 @@ def _bulk_container_operation(container_ids: List[str], db: Session, operation: 
     results = []
     
     operation_map = {
-        'start': lambda cid: monitor.restart_container(cid),  # restart works for stopped containers
+        'start': lambda cid: monitor.start_container(cid),
         'stop': lambda cid: monitor.stop_container(cid),
         'restart': lambda cid: monitor.restart_container(cid),
         'delete': lambda cid: monitor.remove_container(cid),
@@ -464,6 +464,66 @@ async def sync_containers(
     monitor._sync_containers_to_db()
     
     return {"status": "success", "message": "Containers synced"}
+
+
+@router.post("/containers/bulk/start")
+@limiter.limit("30/minute")
+async def bulk_start_containers(
+    request: Request,
+    body: BulkContainerIds,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_role = get_user_role(current_user)
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required for bulk start"
+        )
+    return _bulk_container_operation(body.container_ids, db, 'start', current_user)
+
+@router.post("/containers/bulk/stop")
+@limiter.limit("30/minute")
+async def bulk_stop_containers(
+    request: Request,
+    body: BulkContainerIds,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_role = get_user_role(current_user)
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required for bulk stop"
+        )
+    return _bulk_container_operation(body.container_ids, db, 'stop', current_user)
+
+@router.post("/containers/bulk/restart")
+@limiter.limit("30/minute")
+async def bulk_restart_containers(
+    request: Request,
+    body: BulkContainerIds,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    user_role = get_user_role(current_user)
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required for bulk restart"
+        )
+    return _bulk_container_operation(body.container_ids, db, 'restart', current_user)
+
+@router.post("/containers/bulk/delete")
+@limiter.limit("30/minute")
+async def bulk_delete_containers(
+    request: Request,
+    body: BulkContainerIds,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    # _bulk_container_operation already handles ownership checks
+    return _bulk_container_operation(body.container_ids, db, 'delete', current_user)
 
 
 @router.get("/containers/{container_id}", response_model=ContainerDetail)
@@ -1092,68 +1152,6 @@ async def update_settings(
         jwt_expiration_hours=config.security.jwt_expiration_hours,
     )
 
-
-@router.post("/containers/bulk/start")
-@limiter.limit("30/minute")
-async def bulk_start_containers(
-    request: Request,
-    body: BulkContainerIds,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    user_role = get_user_role(current_user)
-    if user_role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin role required for bulk start"
-        )
-    return _bulk_container_operation(body.container_ids, db, 'start', current_user)
-
-
-@router.post("/containers/bulk/stop")
-@limiter.limit("30/minute")
-async def bulk_stop_containers(
-    request: Request,
-    body: BulkContainerIds,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    user_role = get_user_role(current_user)
-    if user_role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin role required for bulk stop"
-        )
-    return _bulk_container_operation(body.container_ids, db, 'stop', current_user)
-
-
-@router.post("/containers/bulk/restart")
-@limiter.limit("30/minute")
-async def bulk_restart_containers(
-    request: Request,
-    body: BulkContainerIds,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    user_role = get_user_role(current_user)
-    if user_role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin role required for bulk restart"
-        )
-    return _bulk_container_operation(body.container_ids, db, 'restart', current_user)
-
-
-@router.post("/containers/bulk/delete")
-@limiter.limit("30/minute")
-async def bulk_delete_containers(
-    request: Request,
-    body: BulkContainerIds,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
-    # _bulk_container_operation already handles ownership checks
-    return _bulk_container_operation(body.container_ids, db, 'delete', current_user)
 
 
 @router.delete("/containers/{container_id}")
