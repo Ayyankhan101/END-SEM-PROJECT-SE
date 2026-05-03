@@ -42,11 +42,21 @@ async def lifespan(app: FastAPI):
     create_initial_user()
 
     monitor = get_docker_monitor()
+    
+    # Debug: Show Docker config
+    from app.core.config import get_config
+    config = get_config()
+    logger.info(f"Docker socket path: {config.docker.socket_path}")
+    logger.info(f"Docker API version: {config.docker.api_version}")
+    
     if monitor.connect():
+        logger.info(f"Docker connected: {bool(monitor._container_service)}")
+        logger.info(f"Docker client: {monitor._docker_client_service.client}")
         asyncio.create_task(monitor.start_monitoring())
         logger.info("Docker monitoring started")
     else:
         logger.warning("Docker connection failed - running in read-only mode")
+        logger.warning("Hint: Check socket path and permissions. Try: sudo chmod 666 /var/run/docker.sock")
 
     asyncio.create_task(run_periodic_cleanup())
     logger.info("Metrics cleanup job started")

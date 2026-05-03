@@ -14,6 +14,16 @@ from app.services.remediation import get_remediation_service, RemediationService
 router = APIRouter(prefix="/ai", tags=["AI"])
 
 
+def ensure_docker_connected(monitor):
+    """Ensure Docker monitor is connected, reconnect if not."""
+    if not hasattr(monitor, '_container_service') or monitor._container_service is None:
+        if not monitor.connect():
+            raise HTTPException(
+                status_code=500, 
+                detail="Failed to connect to Docker daemon. Is Docker running?"
+            )
+
+
 @router.get("/health")
 async def ai_health_check():
     """Check AI services availability."""
@@ -39,6 +49,7 @@ async def get_anomalies():
     
     try:
         monitor = get_docker_monitor()
+        ensure_docker_connected(monitor)
         containers = monitor.list_containers()
         
         metrics_map = {}
@@ -89,6 +100,7 @@ async def analyze_container(
     from app.services.docker_monitor import get_docker_monitor
     
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     container = monitor.get_container(container_id)
     
     if not container:
@@ -154,6 +166,7 @@ async def get_remediation(container_id: str):
     from app.services.docker_monitor import get_docker_monitor
     
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     container = monitor.get_container(container_id)
     
     if not container:
@@ -208,6 +221,7 @@ async def get_ai_insights():
     
     try:
         monitor = get_docker_monitor()
+        ensure_docker_connected(monitor)
         containers = monitor.list_containers()
     except Exception as e:
         logger.error(f"AI Insights - failed to list containers: {e}", exc_info=True)

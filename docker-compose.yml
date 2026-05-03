@@ -68,6 +68,7 @@ services:
       - TOGETHER_MODEL=${TOGETHER_MODEL:-meta-llama/Llama-3.1-8B-Instruct-Turbo}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-70b-versatile}
+    user: "0:0"  # Run as root to access Docker socket
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s

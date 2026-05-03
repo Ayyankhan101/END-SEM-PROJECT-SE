@@ -430,6 +430,11 @@ async def list_containers(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
+    from app.services.docker_monitor import get_docker_monitor
+    
+    monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
+    
     query = db.query(Container)
     # Show all containers by default (matching AI Insights)
     # Set show_all=False to filter by user ownership
@@ -474,6 +479,7 @@ async def get_container(
 
     from app.services.docker_monitor import get_docker_monitor
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     docker_info = monitor.get_container(container_id)
 
     if docker_info:
@@ -493,7 +499,11 @@ async def get_container_metrics(
     current_user: dict = Depends(get_current_user),
 ):
     container = check_container_ownership(db, container_id, current_user)
-
+    
+    from app.services.docker_monitor import get_docker_monitor
+    monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
+    
     metrics = (
         db.query(Metric)
         .filter(Metric.container_id == container_id)
@@ -526,6 +536,11 @@ async def get_metrics_history(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
+    from app.services.docker_monitor import get_docker_monitor
+    
+    monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
+    
     cutoff = datetime.utcnow() - timedelta(hours=hours)
     query = db.query(Metric).filter(Metric.timestamp >= cutoff)
 
@@ -743,6 +758,7 @@ async def get_container_logs(
     container = check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     logs = monitor.get_container_logs(container_id, lines=lines)
 
     if logs is None:
@@ -769,10 +785,24 @@ async def create_container(
         if not monitor.connect():
             raise HTTPException(status_code=500, detail="Failed to connect to Docker daemon. Is Docker running?")
     
-    result = monitor.create_container(config.model_dump())
+    try:
+        result = monitor.create_container(config.model_dump())
+    except Exception as e:
+        logger.error(f"Container creation failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create container: {str(e)}")
 
     if not result:
-        raise HTTPException(status_code=500, detail="Failed to create container. Check image name and permissions.")
+        raise HTTPException(status_code=500, detail="Failed to create container. Check image name exists and Docker has permissions.")
+    
+    # Check if result contains error (e.g., image pull failed)
+    if isinstance(result, dict) and result.get("error"):
+        error_msg = result.get("error", "Unknown error")
+        suggestion = result.get("suggestion", "")
+        detail_msg = f"{error_msg}. {suggestion}" if suggestion else error_msg
+        raise HTTPException(
+            status_code=500, 
+            detail=detail_msg
+        )
 
     container = Container(
         id=result["id"],
@@ -813,6 +843,7 @@ async def create_stack(
     from app.services.docker_monitor import get_docker_monitor
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     
     # Deploy to Docker
     success = monitor.deploy_stack(stack.name, stack.compose_file)
@@ -848,6 +879,7 @@ async def delete_stack(
     
     # Remove from Docker
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     monitor.stop_stack(stack.name)
     
     # Delete from DB
@@ -872,6 +904,7 @@ async def start_stack(
         raise HTTPException(status_code=404, detail="Stack not found")
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     success = monitor.start_stack(stack.name, stack.compose_file)
 
     if success:
@@ -897,6 +930,7 @@ async def stop_stack(
         raise HTTPException(status_code=404, detail="Stack not found")
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     success = monitor.stop_stack(stack.name)
 
     if success:
@@ -1136,6 +1170,7 @@ async def delete_container(
     container = check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     success = monitor.remove_container(container_id)
 
     if success:

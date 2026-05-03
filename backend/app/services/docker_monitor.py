@@ -37,7 +37,12 @@ class DockerMonitor:
     
     def connect(self) -> bool:
         """Connect to Docker daemon."""
+        logger.info(f"Attempting Docker connection...")
+        logger.info(f"Docker client service: {self._docker_client_service}")
+        logger.info(f"Socket path: {self.config.socket_path}")
+        
         if self._docker_client_service.connect():
+            logger.info("Docker client connected successfully")
             # Initialize dependent services after successful connection
             self._container_service = ContainerService(self._docker_client_service.client)
             self._metrics_service = MetricsService(self._docker_client_service.client)
@@ -45,8 +50,12 @@ class DockerMonitor:
                 self._container_service, 
                 self._alert_service
             )
+            logger.info("All Docker services initialized")
             return True
-        return False
+        else:
+            logger.error("Docker client connection FAILED")
+            logger.error(f"Client object: {self._docker_client_service.client}")
+            return False
     
     def disconnect(self):
         """Disconnect from Docker daemon."""
@@ -161,6 +170,12 @@ class DockerMonitor:
         if self._container_service:
             return self._container_service.create_container(config)
         return None
+    
+    def pull_image(self, image_name: str, tag: str = "latest") -> bool:
+        """Pull an image from Docker Hub."""
+        if self._container_service:
+            return self._container_service.pull_image(image_name, tag)
+        return False
     
     def remove_container(self, container_id: str) -> bool:
         """Remove a container."""

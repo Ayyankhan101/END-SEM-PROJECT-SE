@@ -170,6 +170,8 @@ async def websocket_logs(websocket: WebSocket, container_id: str, token: str = N
     logger.info(f"Log stream for {container_id} (user: {user.get('sub')})")
     
     monitor = get_docker_monitor()
+    if not hasattr(monitor, '_container_service') or monitor._container_service is None:
+        monitor.connect()
     try:
         async for line in monitor.stream_container_logs(container_id, lines=100):
             await websocket.send_text(line)
@@ -208,6 +210,8 @@ async def websocket_exec(websocket: WebSocket, container_id: str, token: str = N
     logger.warning(f"Exec session for {container_id} (user: {user.get('sub')})")
     
     monitor = get_docker_monitor()
+    if not hasattr(monitor, '_container_service') or monitor._container_service is None:
+        monitor.connect()
     try:
         exec_result = monitor.exec_in_container(container_id, ["/bin/sh"], tty=True, stdin=True)
         if not exec_result:
