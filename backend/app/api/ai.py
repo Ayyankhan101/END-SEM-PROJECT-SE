@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional, Dict
 from datetime import datetime
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -280,5 +281,6 @@ async def get_ai_insights():
             "severity_breakdown": severity_counts
         },
         "anomalies": all_anomalies,
+        "provider_name": os.getenv("AI_PROVIDER", "ollama"),
         "provider_available": ollama.health_check()
     }

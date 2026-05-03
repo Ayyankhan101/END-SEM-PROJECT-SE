@@ -9,6 +9,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def ensure_docker_connected(monitor):
+    """Ensure Docker monitor is connected, reconnect if not."""
+    if not hasattr(monitor, '_container_service') or monitor._container_service is None:
+        if not monitor.connect():
+            raise HTTPException(
+                status_code=500, 
+                detail="Failed to connect to Docker daemon. Is Docker running?"
+            )
+
+
 from app.api.utils import (
     check_container_ownership,
     check_resource_ownership,
@@ -588,6 +598,7 @@ async def restart_container(
     check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     success = monitor.restart_container(container_id)
 
     if success:
@@ -620,6 +631,7 @@ async def start_container(
     check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     success = monitor.start_container(container_id)
 
     if success:
@@ -652,6 +664,7 @@ async def pause_container(
     check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     success = monitor.pause_container(container_id)
 
     if success:
@@ -674,6 +687,7 @@ async def unpause_container(
     check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     success = monitor.unpause_container(container_id)
 
     if success:
@@ -696,6 +710,7 @@ async def stop_container(
     check_container_ownership(db, container_id, current_user)
 
     monitor = get_docker_monitor()
+    ensure_docker_connected(monitor)
     success = monitor.stop_container(container_id)
 
     if success:
@@ -745,12 +760,19 @@ async def create_container(
     current_user: dict = Depends(get_current_user),
 ):
     from app.services.docker_monitor import get_docker_monitor
+    from typing import Optional
 
     monitor = get_docker_monitor()
+    
+    # Ensure Docker is connected
+    if not hasattr(monitor, '_container_service') or monitor._container_service is None:
+        if not monitor.connect():
+            raise HTTPException(status_code=500, detail="Failed to connect to Docker daemon. Is Docker running?")
+    
     result = monitor.create_container(config.model_dump())
 
     if not result:
-        raise HTTPException(status_code=500, detail="Failed to create container")
+        raise HTTPException(status_code=500, detail="Failed to create container. Check image name and permissions.")
 
     container = Container(
         id=result["id"],

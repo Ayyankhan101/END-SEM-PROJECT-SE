@@ -76,6 +76,20 @@ class ContainerService:
             logger.error(f"Failed to get container {container_id}: {e}")
             return None
     
+    def start_container(self, container_id: str) -> bool:
+        """Start a container."""
+        if not self.docker_client:
+            return False
+        
+        try:
+            container = self.docker_client.containers.get(container_id)
+            container.start()
+            logger.info(f"Started container {container_id}")
+            return True
+        except APIError as e:
+            logger.error(f"Failed to start {container_id}: {e}")
+            return False
+    
     def restart_container(self, container_id: str) -> bool:
         """
         Restart a container.
