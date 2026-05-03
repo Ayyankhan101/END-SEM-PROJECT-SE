@@ -272,20 +272,20 @@ class ContainerService:
             logger.error(f"Failed to remove {container_id}: {e}")
             return False
     
-     def create_container(self, config: dict) -> Optional[dict]:
-         """
-         Create a new container.
-         
-         Args:
-             config: Container configuration dictionary
-             
-         Returns:
-             Created container info or None if failed
-         """
-         if not self.docker_client:
-             return {"error": "Docker client not initialized"}
-         
-         image = config.get("image", "")
+    def create_container(self, config: dict) -> Optional[dict]:
+        """
+        Create a new container.
+        
+        Args:
+            config: Container configuration dictionary
+            
+        Returns:
+            Created container info or None if failed
+        """
+        if not self.docker_client:
+            return {"error": "Docker client not initialized"}
+        
+        image = config.get("image", "")
         
         # Auto-pull image if not exists locally
         try:
