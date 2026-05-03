@@ -285,8 +285,30 @@ class ContainerService:
         if not self.docker_client:
             return None
         
+        image = config.get("image", "")
+        
+        # Auto-pull image if not exists locally
         try:
-            ports = config.get("ports", {})
+            self.docker_client.images.get(image)
+            logger.info(f"Image {image} found locally")
+        except ImageNotFound:
+            logger.info(f"Image {image} not found locally, pulling...")
+            try:
+                for line in self.docker_client.images.pull(image, stream=True, decode=True):
+                    status = line.get('status', '')
+                    progress = line.get('progress', '')
+                    if status:
+                        logger.info(f"Pull {image}: {status} {progress}")
+                logger.info(f"Image {image} pulled successfully")
+            except Exception as e:
+                logger.error(f"Failed to pull image {image}: {e}")
+                return {
+                    "error": f"Image '{image}' not found and failed to pull. Error: {str(e)}",
+                    "suggestion": f"Manually pull image with: docker pull {image}"
+                }
+        
+        try:
+            ports = config.get("ports") or {}
             ports_list = []
             for container_port, host_port in ports.items():
                 ports_list.append(f"{host_port}:{container_port}")
@@ -334,7 +356,10 @@ class ContainerService:
                 "status": container.status,
             }
         except (APIError, ImageNotFound) as e:
-            logger.error(f"Failed to create container: {e}")
+            logger.error(f"Failed to create container '{config.get('name')}': {config.get('image')} - Error: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error creating container '{config.get('name')}': {type(e).__name__}: {e}")
             return None
     
     def exec_in_container(self, container_id: str, cmd: List[str], tty: bool = True, stdin: bool = False) -> Optional[dict]:
@@ -375,3 +400,22 @@ class ContainerService:
         except APIError as e:
             logger.error(f"Failed to start exec {exec_id}: {e}")
             return None
+
+    def pull_image(self, image_name: str, tag: str = "latest") -> bool:
+        """Pull an image from Docker Hub."""
+        if not self.docker_client:
+            return False
+        
+        try:
+            full_image = f"{image_name}:{tag}"
+            logger.info(f"Pulling image {full_image}...")
+            for line in self.docker_client.images.pull(image_name, tag, stream=True, decode=True):
+                status = line.get('status', '')
+                progress = line.get('progress', '')
+                if status:
+                    logger.info(f"Pull {full_image}: {status} {progress}")
+            logger.info(f"Successfully pulled {full_image}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to pull image {image_name}:{tag}: {e}")
+            return False

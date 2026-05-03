@@ -54,7 +54,17 @@ class DockerClientService:
             logger.info(f"Connected to Docker daemon at {socket}")
             return True
         except DockerException as e:
-            logger.error(f"Failed to connect to Docker at {socket}: {e}")
+            logger.error(f"Docker connection failed at {socket}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error details: {e}")
+            # Log helpful hint based on error
+            error_str = str(e).lower()
+            if "permission" in error_str:
+                logger.error("Hint: Permission denied. Try: sudo chmod 666 /var/run/docker.sock")
+            elif "no such file" in error_str or "not found" in error_str:
+                logger.error("Hint:Socket not found. Check Docker is running: sudo systemctl start docker")
+            elif "connection refused" in error_str:
+                logger.error("Hint: Connection refused. Docker may need TCP config.")
             self._client = None
             return False
 
