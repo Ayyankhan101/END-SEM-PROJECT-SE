@@ -1,7 +1,7 @@
 docker:
   # socket_path: (can be overridden via DOCKWATCH_DOCKER_SOCKET env var)
   socket_path: "/var/run/docker.sock"
-  api_version: "1.53"
+  api_version: "1.51"
   poll_interval: 5
   max_containers: 50
 
@@ -42,5 +42,6 @@ logging:
 cors:
   allowed_origins:
     - "http://localhost:3000"
+    - "http://localhost:3001"
     - "http://localhost:5173"
   allow_credentials: true

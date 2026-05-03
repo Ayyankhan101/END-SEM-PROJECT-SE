@@ -12,7 +12,12 @@ export default function ThreeLoginBackground() {
     const camera = new THREE.PerspectiveCamera(55, mount.clientWidth / mount.clientHeight, 0.1, 100)
     camera.position.set(0, 0.35, 6.5)
 
-    const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
+    let renderer: THREE.WebGLRenderer
+    try {
+      renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
+    } catch (e) {
+      return // silently skip 3D background if WebGL not available
+    }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.8))
     renderer.setSize(mount.clientWidth, mount.clientHeight)
     renderer.domElement.setAttribute('aria-hidden', 'true')

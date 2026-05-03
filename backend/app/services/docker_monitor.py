@@ -261,36 +261,52 @@ class DockerMonitor:
     
     # Stack operations
     def deploy_stack(self, name: str, compose_file: str) -> bool:
-        """Deploy a Docker Compose stack."""
+        """Deploy a Docker Compose stack using Python Docker SDK."""
         if not self._docker_client_service.client:
             return False
         try:
             import yaml
-            import tempfile
-            import os
-            import subprocess
-
+            client = self._docker_client_service.client
             compose_data = yaml.safe_load(compose_file)
-            if not compose_data:
+            if not compose_data or "services" not in compose_data:
                 return False
 
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".yml", delete=False
-            ) as f:
-                f.write(compose_file)
-                compose_path = f.name
+            network_name = f"{name}_default"
+            try:
+                client.networks.create(network_name, driver="bridge")
+            except Exception:
+                pass
 
-            result = subprocess.run(
-                ["docker-compose", "-f", compose_path, "up", "-d"],
-                capture_output=True,
-                text=True,
-            )
-
-            os.unlink(compose_path)
-
-            if result.returncode != 0:
-                logger.error(f"Failed to deploy stack: {result.stderr}")
-                return False
+            for svc_name, svc in compose_data["services"].items():
+                image = svc.get("image")
+                if not image:
+                    continue
+                try:
+                    client.images.pull(image)
+                except Exception:
+                    pass
+                ports = {}
+                for p in svc.get("ports", []):
+                    parts = str(p).split(":")
+                    if len(parts) == 2:
+                        ports[f"{parts[1]}/tcp"] = int(parts[0])
+                env = svc.get("environment", [])
+                container_name = f"{name}_{svc_name}_1"
+                try:
+                    old = client.containers.get(container_name)
+                    old.remove(force=True)
+                except Exception:
+                    pass
+                client.containers.run(
+                    image,
+                    name=container_name,
+                    detach=True,
+                    ports=ports,
+                    environment=env,
+                    network=network_name,
+                    labels={"com.docker.compose.project": name, "com.docker.compose.service": svc_name},
+                    restart_policy={"Name": "unless-stopped"},
+                )
 
             logger.info(f"Deployed stack {name}")
             return True
@@ -299,47 +315,29 @@ class DockerMonitor:
             return False
     
     def start_stack(self, name: str, compose_file: str) -> bool:
-        """Start a Docker Compose stack."""
+        """Start a Docker Compose stack using Python Docker SDK."""
         if not self._docker_client_service.client:
             return False
         try:
-            import tempfile
-            import os
-            import subprocess
-
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".yml", delete=False
-            ) as f:
-                f.write(compose_file)
-                compose_path = f.name
-
-            result = subprocess.run(
-                ["docker-compose", "-f", compose_path, "start"],
-                capture_output=True,
-                text=True,
-            )
-
-            os.unlink(compose_path)
-
-            return result.returncode == 0
+            client = self._docker_client_service.client
+            containers = client.containers.list(all=True, filters={"label": f"com.docker.compose.project={name}"})
+            for c in containers:
+                c.start()
+            return True
         except Exception as e:
             logger.error(f"Failed to start stack: {e}")
             return False
     
     def stop_stack(self, name: str) -> bool:
-        """Stop a Docker Compose stack."""
+        """Stop a Docker Compose stack using Python Docker SDK."""
         if not self._docker_client_service.client:
             return False
         try:
-            import subprocess
-
-            result = subprocess.run(
-                ["docker-compose", "-p", name, "stop"], 
-                capture_output=True, 
-                text=True
-            )
-
-            return result.returncode == 0
+            client = self._docker_client_service.client
+            containers = client.containers.list(filters={"label": f"com.docker.compose.project={name}"})
+            for c in containers:
+                c.stop()
+            return True
         except Exception as e:
             logger.error(f"Failed to stop stack: {e}")
             return False

@@ -89,11 +89,19 @@ function Dashboard() {
     try {
       const data = await api.getContainers() as unknown
       const containerList = Array.isArray(data) ? data : (data as Record<string, any>)?.containers || []
-      setContainers(containerList)
+      // Fetch latest metrics for each container and attach cpu_percent
+      const withMetrics = await Promise.all(containerList.map(async (c: ContainerType) => {
+        try {
+          const m = await api.getContainerMetrics(c.id, 1) as any
+          const latest = m?.metrics?.[0]
+          return { ...c, cpu_percent: latest?.cpu_percent ?? 0, memory_percent: latest?.memory_percent ?? 0 }
+        } catch { return c }
+      }))
+      setContainers(withMetrics)
       setStats({
-        total: containerList.length,
-        running: containerList.filter((c: ContainerType) => c.status === 'running').length,
-        stopped: containerList.filter((c: ContainerType) => c.status !== 'running').length,
+        total: withMetrics.length,
+        running: withMetrics.filter((c: ContainerType) => c.status === 'running').length,
+        stopped: withMetrics.filter((c: ContainerType) => c.status !== 'running').length,
         alerts: alerts?.length || 0
       })
     } catch (err) {
@@ -135,7 +143,7 @@ const avgCpuRaw = (
       .reduce((acc, c) => acc + (c.cpu_percent || 0), 0) / 
     ((Array.isArray(containers) ? containers : []).length || 1)
   )
-  const avgCpu = Number(avgCpuRaw.toFixed(1))
+  const avgCpu = Number(avgCpuRaw.toFixed(2))
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {

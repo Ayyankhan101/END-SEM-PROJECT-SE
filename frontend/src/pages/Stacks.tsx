@@ -154,7 +154,7 @@ services:
   web:
     image: nginx:latest
     ports:
-      - "80:80"
+      - "8088:80"
     restart: unless-stopped
   db:
     image: postgres:15
