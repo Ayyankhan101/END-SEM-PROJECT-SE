@@ -272,20 +272,20 @@ class ContainerService:
             logger.error(f"Failed to remove {container_id}: {e}")
             return False
     
-    def create_container(self, config: dict) -> Optional[dict]:
-        """
-        Create a new container.
-        
-        Args:
-            config: Container configuration dictionary
-            
-        Returns:
-            Created container info or None if failed
-        """
-        if not self.docker_client:
-            return None
-        
-        image = config.get("image", "")
+     def create_container(self, config: dict) -> Optional[dict]:
+         """
+         Create a new container.
+         
+         Args:
+             config: Container configuration dictionary
+             
+         Returns:
+             Created container info or None if failed
+         """
+         if not self.docker_client:
+             return {"error": "Docker client not initialized"}
+         
+         image = config.get("image", "")
         
         # Auto-pull image if not exists locally
         try:
@@ -308,7 +308,49 @@ class ContainerService:
                 }
         
         try:
-            ports = config.get("ports") or {}
+            logger.info(f"Creating container with config: {config}")
+            # Handle ports - can be dict, list, or None
+            ports = config.get("ports")
+            logger.info(f"Ports before processing: {ports} (type: {type(ports).__name__})")
+            if ports is None:
+                ports = {}
+            elif isinstance(ports, list):
+                # If ports is a list of strings like ["8080:80"], convert to dict
+                new_ports = {}
+                for p in ports:
+                    if isinstance(p, str) and ':' in p:
+                        try:
+                            host_port, container_port = p.split(':')
+                            new_ports[container_port.strip()] = int(host_port.strip())
+                        except (ValueError, IndexError):
+                            pass
+                ports = new_ports
+            # Handle environment - can be dict, list, or None
+            environment = config.get("environment")
+            logger.info(f"Environment before processing: {environment} (type: {type(environment).__name__})")
+            if environment is None:
+                environment = {}
+            elif isinstance(environment, list):
+                new_env = {}
+                for e in environment:
+                    if isinstance(e, str) and '=' in e:
+                        try:
+                            key, value = e.split('=', 1)
+                            new_env[key.strip()] = value.strip()
+                        except (ValueError, IndexError):
+                            pass
+                environment = new_env
+            elif not isinstance(environment, dict):
+                environment = {}
+            
+            # Final safety check - ensure ports and environment are dicts
+            if not isinstance(ports, dict):
+                logger.warning(f"Ports is not dict (type: {type(ports)}), resetting to empty dict")
+                ports = {}
+            if not isinstance(environment, dict):
+                logger.warning(f"Environment is not dict (type: {type(environment)}), resetting to empty dict")
+                environment = {}
+            
             ports_list = []
             for container_port, host_port in ports.items():
                 ports_list.append(f"{host_port}:{container_port}")
@@ -357,15 +399,10 @@ class ContainerService:
             }
         except (APIError, ImageNotFound) as e:
             logger.error(f"Failed to create container '{config.get('name')}': {config.get('image')} - Error: {e}")
-            return None
+            return {"error": f"Failed to create container: {str(e)}"}
         except Exception as e:
             logger.error(f"Unexpected error creating container '{config.get('name')}': {type(e).__name__}: {e}")
-            return None
-    
-    def exec_in_container(self, container_id: str, cmd: List[str], tty: bool = True, stdin: bool = False) -> Optional[dict]:
-        """Execute a command in a container."""
-        if not self.docker_client:
-            return None
+            return {"error": f"Unexpected error creating container: {type(e).__name__}: {str(e)}"}
         
         try:
             container = self.docker_client.containers.get(container_id)

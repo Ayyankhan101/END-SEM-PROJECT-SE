@@ -1,10 +1,25 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 import logging
 import asyncio
+import time
+from collections import defaultdict, deque
+from datetime import datetime, timedelta
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+# API metrics storage
+api_metrics = {
+    "requests": defaultdict(lambda: deque(maxlen=1000)),  # endpoint -> deque of request records
+    "total_requests": 0,
+    "slow_threshold_seconds": 1.0,  # Log warnings for requests taking > 1 second
+}
 
 from app.api import (
     endpoints,
@@ -15,6 +30,7 @@ from app.api import (
     docker_resources,
     health,
     ai,
+    metrics,
 )
 from app.db.models import init_db
 from app.services.docker_monitor import get_docker_monitor
@@ -31,6 +47,13 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# API metrics storage
+api_metrics = {
+    "requests": defaultdict(list),  # endpoint -> list of response times
+    "total_requests": 0,
+    "slow_threshold_seconds": 1.0,  # Log warnings for requests taking > 1 second
+}
 
 
 @asynccontextmanager
@@ -91,6 +114,44 @@ app.add_middleware(
     **cors_config,
 )
 
+# API performance monitoring middleware
+@app.middleware("http")
+async def measure_response_time(request: Request, call_next):
+    start_time = time.time()
+    
+    # Process the request
+    response = await call_next(request)
+    
+    # Calculate response time
+    process_time = time.time() - start_time
+    
+    # Store metrics
+    endpoint = request.url.path
+    api_metrics["total_requests"] += 1
+    api_metrics["requests"][endpoint].append({
+        "timestamp": datetime.now().isoformat(),
+        "response_time": process_time,
+        "method": request.method,
+        "status_code": response.status_code,
+    })
+    
+    # Add response header with process time
+    response.headers["X-Process-Time-Seconds"] = f"{process_time:.4f}"
+    
+    # Log slow requests
+    if process_time > api_metrics["slow_threshold_seconds"]:
+        logger.warning(
+            f"Slow request: {request.method} {request.url.path} "
+            f"took {process_time:.2f}s (status: {response.status_code})"
+        )
+    elif process_time > 0.5:  # Info level for moderately slow
+        logger.info(
+            f"Request: {request.method} {request.url.path} "
+            f"took {process_time:.2f}s (status: {response.status_code})"
+        )
+    
+    return response
+
 # Security headers middleware
 @app.middleware("http")
 async def add_security_headers(request, call_next):
@@ -113,6 +174,7 @@ app.include_router(backup, prefix="/api")
 app.include_router(docker_resources, prefix="/api")
 app.include_router(health, prefix="/api")
 app.include_router(ai, prefix="/api")
+app.include_router(metrics, prefix="/api")
 
 
 @app.get("/")
