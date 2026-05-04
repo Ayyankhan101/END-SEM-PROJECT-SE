@@ -559,7 +559,19 @@ async def get_all_container_stats(
     """Get live stats for all containers in one call (batch)."""
     from app.services.docker_monitor import get_docker_monitor
     import logging
+    import asyncio
     logger = logging.getLogger(__name__)
+    
+    # Simple in-memory cache
+    if not hasattr(get_all_container_stats, '_cache'):
+        get_all_container_stats._cache = {'containers': [], 'timestamp': 0}
+    
+    cache = get_all_container_stats._cache
+    cache_age = asyncio.get_event_loop().time() - cache.get('timestamp', 0)
+    
+    # Return cached if fresh (< 5 seconds)
+    if cache.get('containers') and cache_age < 5:
+        return cache
     
     try:
         monitor = get_docker_monitor()
@@ -573,14 +585,28 @@ async def get_all_container_stats(
             if not container_id:
                 continue
             try:
-                stats = monitor.get_container_stats(container_id)
+                # Use cached stats from DB instead of live Docker call for speed
+                cached_metric = db.query(Metric).filter(
+                    Metric.container_id == container_id
+                ).order_by(Metric.timestamp.desc()).first()
+                
+                if cached_metric:
+                    stats = {
+                        "cpu_percent": cached_metric.cpu_percent or 0,
+                        "memory_percent": cached_metric.memory_percent or 0,
+                        "memory_usage": cached_metric.memory_usage or 0,
+                        "memory_limit": cached_metric.memory_usage or 1
+                    }
+                else:
+                    stats = None
+                
                 results.append({
                     "container_id": container_id,
                     "name": container.get("name"),
-                    "cpu_percent": stats.get("cpu_percent") or 0 if stats else 0,
-                    "memory_percent": stats.get("memory_percent") or 0 if stats else 0,
-                    "memory_usage": stats.get("memory_usage") or 0 if stats else 0,
-                    "memory_limit": stats.get("memory_limit") or 0 if stats else 0,
+                    "cpu_percent": stats.get("cpu_percent") if stats else 0,
+                    "memory_percent": stats.get("memory_percent") if stats else 0,
+                    "memory_usage": stats.get("memory_usage") if stats else 0,
+                    "memory_limit": stats.get("memory_limit") if stats else 0,
                 })
             except Exception as e:
                 logger.error(f"Error getting stats for {container_id}: {e}")
@@ -592,6 +618,10 @@ async def get_all_container_stats(
                     "memory_usage": 0,
                     "memory_limit": 0,
                 })
+        
+        # Cache results
+        cache['containers'] = results
+        cache['timestamp'] = asyncio.get_event_loop().time()
         
         return {"containers": results}
     except Exception as e:
