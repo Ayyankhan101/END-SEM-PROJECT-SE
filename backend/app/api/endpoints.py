@@ -549,7 +549,7 @@ async def get_container(
     return container
 
 
-@router.get("/containers/batch")
+@router.get("/batch-stats")
 @limiter.limit("30/minute")
 async def get_all_container_stats(
     request: Request,
