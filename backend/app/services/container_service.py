@@ -308,14 +308,11 @@ class ContainerService:
                 }
         
         try:
-            logger.info(f"Creating container with config: {config}")
             # Handle ports - can be dict, list, or None
             ports = config.get("ports")
-            logger.info(f"Ports before processing: {ports} (type: {type(ports).__name__})")
             if ports is None:
                 ports = {}
             elif isinstance(ports, list):
-                # If ports is a list of strings like ["8080:80"], convert to dict
                 new_ports = {}
                 for p in ports:
                     if isinstance(p, str) and ':' in p:
@@ -325,9 +322,9 @@ class ContainerService:
                         except (ValueError, IndexError):
                             pass
                 ports = new_ports
+            
             # Handle environment - can be dict, list, or None
             environment = config.get("environment")
-            logger.info(f"Environment before processing: {environment} (type: {type(environment).__name__})")
             if environment is None:
                 environment = {}
             elif isinstance(environment, list):
@@ -343,43 +340,30 @@ class ContainerService:
             elif not isinstance(environment, dict):
                 environment = {}
             
-            # Final safety check - ensure ports and environment are dicts
-            if not isinstance(ports, dict):
-                logger.warning(f"Ports is not dict (type: {type(ports)}), resetting to empty dict")
-                ports = {}
-            if not isinstance(environment, dict):
-                logger.warning(f"Environment is not dict (type: {type(environment)}), resetting to empty dict")
-                environment = {}
+            # Use processed values
+            config["environment"] = environment
+            config["ports"] = ports
             
-            ports_list = []
-            for container_port, host_port in ports.items():
-                ports_list.append(f"{host_port}:{container_port}")
-
-            volumes = config.get("volumes") or []
-            binds = []
-            for vol in volumes:
-                if isinstance(vol, dict):
-                    binds.append(
-                        f"{vol.get('host_path')}:{vol.get('container_path')}:{vol.get('mode', 'rw')}"
-                    )
-
+            # Docker SDK port format: {"80/tcp": ("0.0.0.0", 8080)}
             host_config = {}
-            if ports_list:
-                host_config["ports"] = ports_list
-            if binds:
-                host_config["binds"] = binds
-
+            if isinstance(ports, dict) and ports:
+                port_bindings = {}
+                for container_port, host_port in ports.items():
+                    container_port_str = f"{container_port}/tcp"
+                    port_bindings[container_port_str] = ("0.0.0.0", host_port)
+                host_config["ports"] = port_bindings
+            
+            # Default memory: 512MB, CPU: 0.5
+            host_config["mem_limit"] = "512m"
+            host_config["cpu_period"] = 100000
+            host_config["cpu_quota"] = 50000
+            
+            # Override with user provided values
             if config.get("memory_limit"):
                 host_config["mem_limit"] = config.get("memory_limit")
-            else:
-                host_config["mem_limit"] = "512m"  # Default limit
-
             if config.get("cpu_limit"):
                 host_config["cpu_period"] = 100000
                 host_config["cpu_quota"] = int(config.get("cpu_limit") * 100000)
-            else:
-                host_config["cpu_period"] = 100000
-                host_config["cpu_quota"] = 50000  # Default 0.5 CPU
 
             container = self.docker_client.containers.run(
                 image=config["image"],
