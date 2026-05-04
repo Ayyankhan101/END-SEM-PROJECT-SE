@@ -7,8 +7,6 @@ interface FormData {
   image: string;
   name: string;
   ports: string;
-  environment: string;
-  command: string;
   memory_limit: string;
   cpu_limit: string;
 }
@@ -18,8 +16,6 @@ function ContainerCreate() {
     image: '',
     name: '',
     ports: '',
-    environment: '',
-    command: '',
     memory_limit: '',
     cpu_limit: ''
   })
@@ -49,23 +45,10 @@ function ContainerCreate() {
         })
       }
 
-      const environment: Record<string, string> = {}
-      if (formData.environment) {
-        const envPairs = formData.environment.split(',')
-        envPairs.forEach(pair => {
-          const [key, value] = pair.trim().split('=')
-          if (key && value) {
-            environment[key] = value
-          }
-        })
-      }
-
       const config = {
         image: formData.image,
         name: formData.name,
         ports: Object.keys(ports).length ? ports : undefined,
-        environment: Object.keys(environment).length ? environment : undefined,
-        command: formData.command || undefined,
         memory_limit: formData.memory_limit ? parseInt(formData.memory_limit) : undefined,
         cpu_limit: formData.cpu_limit ? parseFloat(formData.cpu_limit) : undefined
       }
@@ -76,8 +59,6 @@ function ContainerCreate() {
         image: '',
         name: '',
         ports: '',
-        environment: '',
-        command: '',
         memory_limit: '',
         cpu_limit: ''
       })
@@ -155,37 +136,9 @@ function ContainerCreate() {
                 value={formData.ports}
                 onChange={handleChange}
                 className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="8080:80, 443:443"
+                placeholder="8080:80"
               />
-              <p className="text-gray-500 text-sm mt-1">Format: host_port:container_port, comma separated</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">
-                Environment Variables
-              </label>
-              <input
-                type="text"
-                name="environment"
-                value={formData.environment}
-                onChange={handleChange}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="KEY=value, DEBUG=true"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">
-                Command
-              </label>
-              <input
-                type="text"
-                name="command"
-                value={formData.command}
-                onChange={handleChange}
-                className="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="/bin/sh"
-              />
+              <p className="text-gray-500 text-sm mt-1">Format: host_port:container_port</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
