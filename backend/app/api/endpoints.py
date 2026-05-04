@@ -549,6 +549,56 @@ async def get_container(
     return container
 
 
+@router.get("/containers/stats")
+@limiter.limit("30/minute")
+async def get_all_container_stats(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get live stats for all containers in one call (batch)."""
+    from app.services.docker_monitor import get_docker_monitor
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        monitor = get_docker_monitor()
+        ensure_docker_connected(monitor)
+        
+        containers = monitor.list_containers()
+        results = []
+        
+        for container in containers:
+            container_id = container.get("id")
+            if not container_id:
+                continue
+            try:
+                stats = monitor.get_container_stats(container_id)
+                results.append({
+                    "container_id": container_id,
+                    "name": container.get("name"),
+                    "cpu_percent": stats.get("cpu_percent") or 0 if stats else 0,
+                    "memory_percent": stats.get("memory_percent") or 0 if stats else 0,
+                    "memory_usage": stats.get("memory_usage") or 0 if stats else 0,
+                    "memory_limit": stats.get("memory_limit") or 0 if stats else 0,
+                })
+            except Exception as e:
+                logger.error(f"Error getting stats for {container_id}: {e}")
+                results.append({
+                    "container_id": container_id,
+                    "name": container.get("name"),
+                    "cpu_percent": 0,
+                    "memory_percent": 0,
+                    "memory_usage": 0,
+                    "memory_limit": 0,
+                })
+        
+        return {"containers": results}
+    except Exception as e:
+        logger.error(f"Batch stats error: {e}")
+        return {"containers": []}
+
+
 @router.get("/containers/{container_id}/stats")
 @limiter.limit("60/minute")
 async def get_container_stats(
