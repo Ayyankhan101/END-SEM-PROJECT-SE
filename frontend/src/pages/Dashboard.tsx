@@ -90,24 +90,23 @@ function Dashboard() {
       const data = await api.getContainers() as unknown
       const containerList = Array.isArray(data) ? data : (data as Record<string, any>)?.containers || []
       
-      // Fetch live stats with timeout - each container max 2s
-      const withMetrics = await Promise.all(containerList.map(async (c: ContainerType) => {
-        try {
-          const stats = await Promise.race([
-            api.getContainerStats(c.id),
-            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
-          ]) as any
-          return { 
-            ...c, 
-            cpu_percent: stats?.cpu_percent ?? 0, 
-            memory_percent: stats?.memory_percent ?? 0,
-            memory_usage: stats?.memory_usage ?? 0,
-            memory_limit: stats?.memory_limit ?? 0
-          }
-        } catch { 
-          return { ...c, cpu_percent: 0, memory_percent: 0, memory_usage: 0, memory_limit: 0 } 
+      console.log('Fetchcontainers: containerList length =', containerList.length)
+      
+      // Use batch endpoint for all stats at once
+      const statsData = await api.getAllContainerStats() as any
+      const statsMap = new Map((statsData.containers || []).map((s: any) => [s.container_id, s]))
+      
+      const withMetrics = containerList.map((c: ContainerType) => {
+        const stats = statsMap.get(c.id) as any
+        return { 
+          ...c, 
+          cpu_percent: stats?.cpu_percent ?? 0, 
+          memory_percent: stats?.memory_percent ?? 0,
+          memory_usage: stats?.memory_usage ?? 0,
+          memory_limit: stats?.memory_limit ?? 0
         }
-      }))
+      })
+      console.log('withMetrics CPU values:', withMetrics.map((c: any) => c.cpu_percent))
       setContainers(withMetrics)
       setStats({
         total: withMetrics.length,
@@ -155,6 +154,7 @@ const avgCpuRaw = (
     ((Array.isArray(containers) ? containers : []).length || 1)
   )
   const avgCpu = Number(avgCpuRaw.toFixed(2))
+  console.log('avgCpuRaw:', avgCpuRaw, 'containers:', containers.length, 'cpu values:', containers.map(c => c.cpu_percent))
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
