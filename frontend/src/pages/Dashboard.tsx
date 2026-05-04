@@ -89,13 +89,24 @@ function Dashboard() {
     try {
       const data = await api.getContainers() as unknown
       const containerList = Array.isArray(data) ? data : (data as Record<string, any>)?.containers || []
-      // Fetch latest metrics for each container and attach cpu_percent
+      
+      // Fetch live stats with timeout - each container max 2s
       const withMetrics = await Promise.all(containerList.map(async (c: ContainerType) => {
         try {
-          const m = await api.getContainerMetrics(c.id, 1) as any
-          const latest = m?.metrics?.[0]
-          return { ...c, cpu_percent: latest?.cpu_percent ?? 0, memory_percent: latest?.memory_percent ?? 0 }
-        } catch { return c }
+          const stats = await Promise.race([
+            api.getContainerStats(c.id),
+            new Promise<any>((_, reject) => setTimeout(() => reject(new Error('timeout')), 2000))
+          ]) as any
+          return { 
+            ...c, 
+            cpu_percent: stats?.cpu_percent ?? 0, 
+            memory_percent: stats?.memory_percent ?? 0,
+            memory_usage: stats?.memory_usage ?? 0,
+            memory_limit: stats?.memory_limit ?? 0
+          }
+        } catch { 
+          return { ...c, cpu_percent: 0, memory_percent: 0, memory_usage: 0, memory_limit: 0 } 
+        }
       }))
       setContainers(withMetrics)
       setStats({

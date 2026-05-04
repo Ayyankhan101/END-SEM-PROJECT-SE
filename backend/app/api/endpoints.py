@@ -549,6 +549,38 @@ async def get_container(
     return container
 
 
+@router.get("/containers/{container_id}/stats")
+@limiter.limit("60/minute")
+async def get_container_stats(
+    request: Request,
+    container_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    """Get live stats for a container directly from Docker."""
+    from app.services.docker_monitor import get_docker_monitor
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        monitor = get_docker_monitor()
+        ensure_docker_connected(monitor)
+        
+        stats = monitor.get_container_stats(container_id)
+        if stats:
+            return {
+                "container_id": container_id,
+                "cpu_percent": stats.get("cpu_percent") or 0,
+                "memory_percent": stats.get("memory_percent") or 0,
+                "memory_usage": stats.get("memory_usage") or 0,
+                "memory_limit": stats.get("memory_limit") or 0,
+            }
+    except Exception as e:
+        logger.error(f"Stats error for {container_id}: {e}")
+    
+    return {"container_id": container_id, "cpu_percent": 0, "memory_percent": 0}
+
+
 @router.get("/containers/{container_id}/metrics")
 @limiter.limit("60/minute")
 async def get_container_metrics(

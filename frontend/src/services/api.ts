@@ -151,6 +151,11 @@ class ApiClient {
     return response.data
   }
 
+  async getContainerStats(id: string): Promise<{ container_id: string; cpu_percent: number; memory_percent: number; memory_usage: number; memory_limit: number }> {
+    const response = await this.client.get(`/containers/${id}/stats`)
+    return response.data
+  }
+
   async getContainerLogs(id: string, lines: number = 100): Promise<{ container_id: string; logs: string }> {
     const response = await this.client.get(`/containers/${id}/logs`, {
       params: { lines }
