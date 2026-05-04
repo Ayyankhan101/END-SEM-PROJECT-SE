@@ -391,13 +391,19 @@ class DockerMonitor:
                         # Check thresholds
                         self.check_thresholds(container_id, stats)
                     
-                    # Check for recovery needs
+# Check for recovery needs
                     self.check_and_recover(container_id, container)
-                    
+
+                    # Include cpu_percent in container update
+                    container_with_stats = {**container}
+                    if stats:
+                        container_with_stats["cpu_percent"] = stats.get("cpu_percent")
+                        container_with_stats["memory_percent"] = stats.get("memory_percent")
+
                     # Notify about container update
                     self._notify_callbacks({
                         "type": "container_update",
-                        "container": container,
+                        "container": container_with_stats,
                         "timestamp": datetime.utcnow().isoformat(),
                     })
                 
