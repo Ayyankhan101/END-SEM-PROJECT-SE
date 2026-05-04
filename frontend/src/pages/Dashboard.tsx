@@ -87,50 +87,29 @@ function Dashboard() {
 
   const fetchContainers = useCallback(async () => {
     try {
-      const data = await api.getContainers() as unknown
-      const containerList = Array.isArray(data) ? data : (data as Record<string, any>)?.containers || []
+      const containerList = Array.isArray(containers) ? containers : []
+      console.log('Using WebSocket data - containers:', containerList.length, 'cpu values:', containerList.map((c: any) => c.cpu_percent))
       
-      console.log('Fetchcontainers: containerList length =', containerList.length)
-      
-      // Use batch endpoint for all stats at once
-      const statsData = await api.getAllContainerStats() as any
-      const statsMap = new Map((statsData.containers || []).map((s: any) => [s.container_id, s]))
-      
-      const withMetrics = containerList.map((c: ContainerType) => {
-        const stats = statsMap.get(c.id) as any
-        return { 
-          ...c, 
-          cpu_percent: stats?.cpu_percent ?? 0, 
-          memory_percent: stats?.memory_percent ?? 0,
-          memory_usage: stats?.memory_usage ?? 0,
-          memory_limit: stats?.memory_limit ?? 0
-        }
-      })
-      console.log('withMetrics CPU values:', withMetrics.map((c: any) => c.cpu_percent))
-      setContainers(withMetrics)
       setStats({
-        total: withMetrics.length,
-        running: withMetrics.filter((c: ContainerType) => c.status === 'running').length,
-        stopped: withMetrics.filter((c: ContainerType) => c.status !== 'running').length,
+        total: containerList.length,
+        running: containerList.filter((c: ContainerType) => c.status === 'running').length,
+        stopped: containerList.filter((c: ContainerType) => c.status !== 'running').length,
         alerts: alerts?.length || 0
       })
     } catch (err) {
-      console.error('Failed to fetch containers:', err)
+      console.error('Error updating stats:', err)
     } finally {
       setLoading(false)
     }
-  }, [setContainers])
+  }, [containers])
 
   const handleRefresh = useCallback(async () => {
     await api.syncContainers()
-    await fetchContainers()
-  }, [fetchContainers])
+    // No need to call fetchContainers - WebSocket updates containers automatically
+  }, [])
 
-  useEffect(() => {
-    fetchContainers()
-    const interval = setInterval(fetchContainers, 10000)
-    return () => clearInterval(interval)
-  }, [fetchContainers])
+  // Use WebSocket data - no polling needed
+  // Container updates come via WebSocket with cpu_percent included
 
   const filteredContainers = useMemo(() => 
     Array.isArray(containers) 
