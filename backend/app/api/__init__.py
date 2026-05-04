@@ -1,0 +1,9 @@
+from app.api.endpoints import router as endpoints
+from app.api.websocket import router as websocket
+from app.api.audit import router as audit
+from app.api.notifications import router as notifications
+from app.api.backup import router as backup
+from app.api.docker_resources import router as docker_resources
+from app.api.health import router as health
+from app.api.ai import router as ai
+from app.api.metrics import router as metrics
