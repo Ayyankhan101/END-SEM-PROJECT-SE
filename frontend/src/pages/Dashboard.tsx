@@ -87,9 +87,12 @@ function Dashboard() {
 
   const fetchContainers = useCallback(async () => {
     try {
-      const containerList = Array.isArray(containers) ? containers : []
-      console.log('Using WebSocket data - containers:', containerList.length, 'cpu values:', containerList.map((c: any) => c.cpu_percent))
+      // Get initial container list - used once on app start
+      const data = await api.getContainers() as unknown
+      const containerList = Array.isArray(data) ? data : (data as Record<string, any>)?.containers || []
+      console.log('Initial load - containers:', containerList.length)
       
+      setContainers(containerList)
       setStats({
         total: containerList.length,
         running: containerList.filter((c: ContainerType) => c.status === 'running').length,
@@ -97,19 +100,20 @@ function Dashboard() {
         alerts: alerts?.length || 0
       })
     } catch (err) {
-      console.error('Error updating stats:', err)
+      console.error('Error fetching containers:', err)
     } finally {
       setLoading(false)
     }
-  }, [containers])
+  }, [])
 
   const handleRefresh = useCallback(async () => {
     await api.syncContainers()
-    // No need to call fetchContainers - WebSocket updates containers automatically
   }, [])
 
-  // Use WebSocket data - no polling needed
-  // Container updates come via WebSocket with cpu_percent included
+  // Initial load once, then WebSocket handles real-time CPU updates
+  useEffect(() => {
+    fetchContainers()
+  }, [fetchContainers])
 
   const filteredContainers = useMemo(() => 
     Array.isArray(containers) 
