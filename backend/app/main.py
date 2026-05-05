@@ -43,19 +43,6 @@ from app.core.rate_limiter import limiter
 from app.core.exceptions import setup_exception_handlers
 
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
-logger = logging.getLogger(__name__)
-
-# API metrics storage
-api_metrics = {
-    "requests": defaultdict(list),  # endpoint -> list of response times
-    "total_requests": 0,
-    "slow_threshold_seconds": 1.0,  # Log warnings for requests taking > 1 second
-}
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting DockWatch application...")

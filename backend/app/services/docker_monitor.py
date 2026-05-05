@@ -362,23 +362,24 @@ class DockerMonitor:
         """Start the main monitoring loop."""
         self._running = True
         
-        # Sync containers to database on startup
-        self._sync_containers_to_db()
+        # Sync containers to database on startup (run in thread to avoid blocking)
+        await asyncio.to_thread(self._sync_containers_to_db)
         
         sync_counter = 0
         while self._running:
             try:
-                containers = self.list_containers()
+                # List containers (run in thread to avoid blocking event loop)
+                containers = await asyncio.to_thread(self.list_containers)
                 
-                # Sync every iteration to ensure new containers are tracked
-                self._sync_containers_to_db()
+                # Sync every iteration to ensure new containers are tracked (run in thread)
+                await asyncio.to_thread(self._sync_containers_to_db)
                 
                 batch_metrics = []
                 for container in containers:
                     container_id = container["id"]
                     
-                    # Get stats
-                    stats = self.get_container_stats(container_id)
+                    # Get stats (run in thread to avoid blocking event loop)
+                    stats = await asyncio.to_thread(self.get_container_stats, container_id)
                     if stats:
                         batch_metrics.append(stats)
                         self._notify_callbacks({

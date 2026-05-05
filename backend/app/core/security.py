@@ -23,10 +23,10 @@ security = HTTPBearer()
 # Encryption key for TOTP secrets
 _encryption_key = os.environ.get("DOCKWATCH_ENCRYPTION_KEY")
 if not _encryption_key:
-    # Fallback: derive from JWT secret if available, or use a hardcoded dev key
-    jwt_secret = os.environ.get("DOCKWATCH_JWT_SECRET", "dev-secret")
-    key = hashlib.sha256(jwt_secret.encode()).digest()
-    _encryption_key = base64.urlsafe_b64encode(key).decode()
+    raise ValueError(
+        "DOCKWATCH_ENCRYPTION_KEY is required for TOTP encryption. "
+        "Generate with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
+    )
 
 _fernet = Fernet(_encryption_key.encode())
 
@@ -278,23 +278,24 @@ def require_role(required_role: str):
 
 
 def create_initial_user():
+    import secrets
     from app.db import get_db
     from app.db.models import User
 
     db = next(get_db())
     existing = db.query(User).first()
     if not existing:
-        password = "admin123"
+        password = secrets.token_urlsafe(12)
         user = User(
             username="admin",
             hashed_password=get_password_hash(password),
             role="admin",
-            must_change_password=False,
+            must_change_password=True,
         )
         db.add(user)
         db.commit()
         logger.warning("=" * 60)
-        logger.warning("INITIAL USER CREATED")
+        logger.warning("INITIAL USER CREATED - PASSWORD CHANGE REQUIRED")
         logger.warning("Username: admin")
-        logger.warning(f"Password: {password}")
+        logger.warning("Password: %s", password)
         logger.warning("=" * 60)
