@@ -47,7 +47,7 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
   const stopped = Math.max(containers.length - running, 0)
   const maxCpuVal = Math.max(...chartData.map(p => p.cpu))
   const maxMemVal = Math.max(...chartData.map(p => p.memory))
-  const yDomain: [number, number] = [0, Math.max(100, Math.ceil(Math.max(maxCpuVal, maxMemVal) * 1.2 / 10) * 10)]
+  const yDomain: [number, number] = [0, Math.max(10, Math.ceil(Math.max(maxCpuVal, maxMemVal) * 1.5))]
   const statusData = [
     { name: 'Running', count: running },
     { name: 'Stopped', count: stopped }
