@@ -170,9 +170,15 @@ function App() {
     }
 
     ws.onmessage = (event) => {
-      if (event.data === 'pong') return
-
+      // Skip ping/pong and non-JSON messages from Socket.IO
+      if (event.data === 'pong' || event.data === 'ping') return
+      
       try {
+        // Skip non-JSON messages
+        if (typeof event.data !== 'string' || !event.data.startsWith('{')) {
+          return
+        }
+        
         const data = JSON.parse(event.data)
         
         if (data.type === 'container_update') {
