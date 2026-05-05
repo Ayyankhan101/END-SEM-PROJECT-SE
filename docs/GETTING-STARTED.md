@@ -25,10 +25,10 @@ The easiest way to start DockWatch is using the provided scripts:
 Once the containers are running:
 
 1.  **Dashboard**: Open [http://localhost:3000](http://localhost:3000) in your web browser.
-2.  **Login**: Use the default credentials:
+2.  **Login**: Use the credentials shown in the startup logs:
     - **Username**: `admin`
-    - **Password**: `admin123`
-    > **Note**: For your security, you should change the admin password immediately after your first login.
+    - **Password**: (check logs for the generated password)
+    > **Note**: You will be prompted to change your password on first login.
 
 ## Local Development
 
@@ -42,6 +42,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 export DOCKWATCH_JWT_SECRET="your-secret-key"
+export DOCKWATCH_ENCRYPTION_KEY="your-encryption-key"
 python -m app.main
 ```
 

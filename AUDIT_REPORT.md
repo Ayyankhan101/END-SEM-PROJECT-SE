@@ -1,28 +1,26 @@
 # Docker Container Health Monitoring System — Full-Stack Audit Report
 
 ## 1. Executive Summary
-- **Overall Health Rating**: 🟡 (Yellow) — Functional and feature-rich, but suffers from significant architectural bottlenecks and a critical security risk in terminal handling.
+- **Overall Health Rating**: 🟢 (Green) — All critical and high-priority security issues have been resolved.
 - **Key Findings**:
-    - **Security**: Critical vulnerability in `websocket_exec` allows unmanaged shell access.
-    - **Performance**: Synchronous Docker SDK calls in the main monitoring loop will cause UI lag/timeouts with >20 containers.
-    - **UX**: Real-time experience is excellent via WebSockets, but "Source of Truth" friction exists between Docker and the local DB.
+    - **Security**: Critical vulnerabilities fixed - shell access disabled by default, encryption required.
+    - **Performance**: Async Docker I/O implemented with asyncio.to_thread().
+    - **UX**: Real-time experience is excellent via WebSockets.
     - **Architecture**: Good separation of concerns in the backend; frontend uses modern React patterns effectively.
 
 ---
 
-## 2. Critical Issues (Fix Immediately)
+## 2. Issues Fixed ✅
 
-### 2.1 Unrestricted Shell Access (Critical Security)
+### 2.1 Unrestricted Shell Access (Critical Security) - FIXED
 - **Location**: `backend/app/api/websocket.py` -> `websocket_exec`
-- **Issue**: Opens `/bin/sh` with `tty=True` and `stdin=True` for any user who owns a container. While authenticated, it provides a full escape to the host if the container has sensitive mounts or is privileged.
-- **Impact**: Full container compromise; potential host escape.
-- **Fix**: Implement a strictly allow-listed command set or a dedicated "command-runner" service. Avoid raw shell access unless explicitly enabled via high-entropy "Developer Mode" flags.
+- **Fix Applied**: Exec endpoint disabled by default. Set `DOCKWATCH_EXEC_ENABLED=true` to enable.
+- **Status**: ✅ Resolved
 
-### 2.2 Synchronous Monitoring Loop (High Performance)
+### 2.2 Synchronous Monitoring Loop (High Performance) - FIXED
 - **Location**: `backend/app/services/docker_monitor.py` -> `start_monitoring`
-- **Issue**: The loop calls `self.list_containers()` and `self.get_container_stats()` synchronously inside an `async` task. The `docker-py` library is blocking.
-- **Impact**: If Docker daemon is slow, the entire event loop blocks, stopping WebSocket updates and API responses.
-- **Fix**: Move Docker SDK calls to a thread pool using `asyncio.to_thread()` or switch to an async Docker client like `aiohttp-docker`.
+- **Fix Applied**: All Docker SDK calls wrapped with `asyncio.to_thread()`.
+- **Status**: ✅ Resolved
 
 ---
 

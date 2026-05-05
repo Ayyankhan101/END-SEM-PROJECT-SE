@@ -9,6 +9,11 @@
 - [x] SEC-004: Restricted CORS to specific origins
 - [x] SEC-005: Added comprehensive input validation
 - [x] SEC-006: Created `.gitignore` for `.env`
+- [x] SEC-007: Fixed unrestricted shell access (exec disabled by default)
+- [x] SEC-008: Fixed hardcoded admin password (random + must_change=True)
+- [x] SEC-009: Fixed TOTP encryption key fallback (now required)
+- [x] SEC-010: Enabled docker-socket-proxy service
+- [x] SEC-011: Removed root user from docker-compose
 
 ### Backend Architecture
 - [x] ARCH-001: Split docker_monitor.py god class into focused services
@@ -17,7 +22,7 @@
 - [x] ARCH-004: Created MetricsService
 - [x] ARCH-005: Created AlertService
 - [x] ARCH-006: Created RecoveryService
-- [x] ARCH-007: Fixed sync/async mixing
+- [x] ARCH-007: Fixed sync/async mixing (wrapped with asyncio.to_thread)
 - [x] ARCH-008: Added custom exception classes
 
 ### Database
