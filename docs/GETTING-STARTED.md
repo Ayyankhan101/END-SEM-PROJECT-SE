@@ -24,11 +24,11 @@ The easiest way to start DockWatch is using the provided scripts:
 
 Once the containers are running:
 
-1.  **Dashboard**: Open [http://localhost:3000](http://localhost:3000) in your web browser.
-2.  **Login**: Use the credentials shown in the startup logs:
+1.  **Dashboard**: Open [http://localhost:3001](http://localhost:3001) in your web browser.
+2.  **Login Credentials**:
     - **Username**: `admin`
-    - **Password**: (check logs for the generated password)
-    > **Note**: You will be prompted to change your password on first login.
+    - **Password**: `admin123`
+    > **Note**: Default credentials are for development. In production, the password is randomized - check `docker compose logs backend` for the generated password.
 
 ## Local Development
 

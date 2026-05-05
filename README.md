@@ -5,15 +5,21 @@ Welcome to DockWatch, a real-time Docker container monitoring and management das
 ## Overview
 DockWatch provides real-time monitoring, auto-recovery, and management for Docker containers.
 
-## Guides
-- [Getting Started](/getting-started)
-- [API Reference](/api)
-- [Deployment](/deployment)
-
 ## Quick Start
 ```bash
 ./start.sh
 ```
 
-## Need Help?
-Check out our guides or reach out to the project maintainers.
+## Access
+- **Dashboard**: http://localhost:3001
+- **API**: http://localhost:3001/api
+- **Health**: http://localhost:3001/api/health
+
+## Default Credentials
+- **Username**: `admin`
+- **Password**: `admin123` (development only)
+
+## Guides
+- [Getting Started](/docs/GETTING-STARTED.md)
+- [API Reference](/docs/API.md)
+- [Deployment](/docs/DEPLOYMENT.md)
