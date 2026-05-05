@@ -77,6 +77,12 @@ function MetricsChart({ data = [], title = 'Metrics' }: MetricsChartProps) {
     ? chartData.reduce((sum, point) => sum + point.ioLoad, 0) / chartData.length
     : 0
 
+  // Calculate dynamic Y-axis for main chart
+  const maxCpu = hasData ? Math.max(...chartData.map(point => point.cpu)) : 0
+  const maxMemory = hasData ? Math.max(...chartData.map(point => point.memory)) : 0
+  const mainMaxValue = Math.max(maxCpu, maxMemory)
+  const mainYMax = Math.max(Math.ceil(mainMaxValue * 1.1), 10) // Minimum 10 for visibility
+
   const tooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null
     const point = payload[0]?.payload as ChartDataPoint
@@ -141,7 +147,7 @@ function MetricsChart({ data = [], title = 'Metrics' }: MetricsChartProps) {
           </div>
         </div>
 
-        <div className="h-[42rem] min-h-[38rem]">
+        <div className="h-[28rem] min-h-[24rem] md:h-[36rem] lg:h-[42rem]">
           {!hasData ? renderEmpty() : (
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 14, right: 28, left: 8, bottom: 42 }}>
@@ -177,7 +183,7 @@ function MetricsChart({ data = [], title = 'Metrics' }: MetricsChartProps) {
                   padding={{ left: 18, right: 18 }}
                 />
                 <YAxis
-                  domain={[0, 100]}
+                  domain={[0, mainYMax]}
                   tick={axisText}
                   tickFormatter={(value) => `${Math.round(Number(value))}%`}
                   tickLine={false}
@@ -269,6 +275,22 @@ interface SupportChartProps {
 function SupportChart({ title, description, data, tooltip, empty, gridStroke, axisText, type }: SupportChartProps) {
   const hasData = data.length > 0
 
+  // Calculate dynamic Y-axis based on chart type
+  let yMax = 100
+  if (hasData) {
+    if (type === 'comparison') {
+      const maxCpu = Math.max(...data.map(point => point.cpu))
+      const maxMemory = Math.max(...data.map(point => point.memory))
+      yMax = Math.max(Math.ceil(Math.max(maxCpu, maxMemory) * 1.1), 10)
+    } else if (type === 'io') {
+      const maxIo = Math.max(...data.map(point => point.ioLoad))
+      yMax = Math.max(Math.ceil(maxIo * 1.1), 10)
+    } else if (type === 'health') {
+      const maxHealth = Math.max(...data.map(point => point.health))
+      yMax = Math.max(Math.ceil(maxHealth * 1.1), 10)
+    }
+  }
+
   return (
     <div className="dashboard-card chart-card">
       <div className="mb-4">
@@ -276,7 +298,7 @@ function SupportChart({ title, description, data, tooltip, empty, gridStroke, ax
         <h4 className="mt-1 text-lg font-semibold text-[#111827] dark:text-[#e5e7eb]">{title}</h4>
         <p className="mt-1 text-sm text-[#6b7280] dark:text-[#9ca3af]">{description}</p>
       </div>
-      <div className="h-80">
+      <div className="h-64 md:h-80">
         {!hasData ? empty : (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={{ top: 10, right: 16, left: 0, bottom: 26 }}>
@@ -292,7 +314,7 @@ function SupportChart({ title, description, data, tooltip, empty, gridStroke, ax
                 minTickGap={36}
               />
               <YAxis
-                domain={[0, 100]}
+                domain={[0, yMax]}
                 tick={{ ...axisText, fontSize: 11 }}
                 tickFormatter={(value) => `${Math.round(Number(value))}%`}
                 tickLine={false}
