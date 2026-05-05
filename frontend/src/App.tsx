@@ -1,5 +1,14 @@
 import { useState, useEffect, createContext, useContext, useRef, useCallback } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+
+// App configuration constants
+const CONFIG = {
+  HEARTBEAT_INTERVAL_MS: 15000,
+  CONNECTIVITY_CHECK_INTERVAL_MS: 30000,
+  RECONNECT_MAX_ATTEMPTS: 10,
+  RECONNECT_BASE_DELAY_MS: 1000,
+}
+
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ContainerDetail from './pages/ContainerDetail'
@@ -99,7 +108,7 @@ function App() {
         })
           .then(res => setIsConnected(res.ok))
           .catch(() => setIsConnected(false))
-      }, 30000)
+      }, CONFIG.CONNECTIVITY_CHECK_INTERVAL_MS)
       return () => clearInterval(interval)
     }
   }, [token, connectionChecked])
@@ -139,9 +148,7 @@ function App() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const heartbeatIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reconnectAttemptRef = useRef(0)
-  const maxReconnectDelay = 30000
-  const baseReconnectDelay = 1000
-  const MAX_WS_RETRIES = 3
+  const MAX_WS_RETRIES = CONFIG.RECONNECT_MAX_ATTEMPTS
 
   const [wsFailed, setWsFailed] = useState(false)
 
@@ -227,8 +234,8 @@ function App() {
       
       // Exponential backoff reconnect
       const delay = Math.min(
-        baseReconnectDelay * Math.pow(2, reconnectAttemptRef.current),
-        maxReconnectDelay
+        CONFIG.RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectAttemptRef.current),
+        30000
       )
       reconnectAttemptRef.current += 1
       console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current})`)
