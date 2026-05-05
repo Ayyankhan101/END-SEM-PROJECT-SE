@@ -26,7 +26,8 @@ interface FleetPoint {
 
 function getMetricValue(container: Container, key: 'cpu_percent' | 'memory_percent', fallback: number) {
   const value = (container as any)[key]
-  return typeof value === 'number' && Number.isFinite(value) ? Number(value.toFixed(1)) : fallback
+  const realValue = typeof value === 'number' && Number.isFinite(value) ? Number(value.toFixed(1)) : 0
+  return realValue > 0 ? realValue : fallback
 }
 
 export default function DashboardCharts({ containers }: DashboardChartsProps) {

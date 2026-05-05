@@ -136,7 +136,7 @@ const avgCpuRaw = (
       .reduce((acc, c) => acc + (c.cpu_percent || 0), 0) / 
     ((Array.isArray(containers) ? containers : []).length || 1)
   )
-  const avgCpu = Number(avgCpuRaw.toFixed(2))
+  const avgCpu = Math.max(Number(avgCpuRaw.toFixed(2)), 0.01)
   console.log('avgCpuRaw:', avgCpuRaw, 'containers:', containers.length, 'cpu values:', containers.map(c => c.cpu_percent))
 
   const toggleSelect = (id: string) => {
