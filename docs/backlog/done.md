@@ -25,6 +25,15 @@
 - [x] ARCH-007: Fixed sync/async mixing (wrapped with asyncio.to_thread)
 - [x] ARCH-008: Added custom exception classes
 
+### Frontend Improvements
+- [x] FE-001: Added configurable heartbeat interval (CONFIG)
+- [x] FE-002: Increased WebSocket retry limit to 10
+- [x] FE-003: Added exponential backoff for reconnects
+- [x] FE-004: Added skipInitialLoading option to useFetch hook
+- [x] FE-005: Dynamic chart Y-axis scaling for real-time data
+- [x] FE-006: Real-time CPU/metrics from WebSocket (no mock data)
+- [x] ARCH-008: Added custom exception classes
+
 ### Database
 - [x] DB-001: Set up Alembic for database migrations
 - [x] DB-002: Created initial migration
