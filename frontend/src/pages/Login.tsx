@@ -1,10 +1,12 @@
 import { useState, FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
 import { Activity, Boxes, Container, Eye, EyeOff, KeyRound, Lock, ShieldCheck, UserRound } from 'lucide-react'
 import ThreeLoginBackground from '@/components/ThreeLoginBackground'
 
 function Login() {
+  const navigate = useNavigate()
   const [username, setUsername] = useState<string>('')
   const [password, setPassword] = useState<string>('')
   const [showPassword, setShowPassword] = useState<boolean>(false)
@@ -31,6 +33,7 @@ function Login() {
         const data = await api.verify2FA(currentUserId, twoFactorCode)
         authLogin(data.access_token, currentUserId)
         localStorage.removeItem('pendingUserId')
+        navigate('/')
       } else {
         const data = await api.login({ username, password })
         if (data.requires_2fa) {
@@ -43,10 +46,13 @@ function Login() {
           }
         } else {
           authLogin(data.access_token, data.user_id)
+          localStorage.removeItem('pendingUserId')
+          navigate('/')
         }
       }
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed')
+      console.error('Login error:', err)
+      setError(err.response?.data?.detail || err.message || 'Login failed')
     } finally {
       setIsLoading(false)
     }

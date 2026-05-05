@@ -49,6 +49,16 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
     { name: 'Stopped', count: stopped }
   ]
 
+  // Calculate dynamic Y-axis for main chart
+  const maxCpu = chartData.length > 0 ? Math.max(...chartData.map(d => d.cpu)) : 0
+  const maxMemory = chartData.length > 0 ? Math.max(...chartData.map(d => d.memory)) : 0
+  const maxValue = Math.max(maxCpu, maxMemory)
+  const yMax = Math.max(Math.ceil(maxValue * 1.1), 10) // Minimum 10 for visibility
+
+  // Calculate dynamic Y-axis for status chart
+  const maxCount = statusData.length > 0 ? Math.max(...statusData.map(d => d.count)) : 0
+  const statusYMax = Math.max(Math.ceil(maxCount * 1.1), 5) // Minimum 5 for visibility
+
   const tooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null
     return (
@@ -87,7 +97,7 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
             <span className="inline-flex items-center gap-2"><HardDrive className="h-4 w-4 text-emerald-500" /> Memory</span>
           </div>
         </div>
-        <div className="h-[32rem] min-h-[30rem]">
+        <div className="h-[24rem] min-h-[20rem] md:h-[28rem] lg:h-[32rem]">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 14, right: 18, left: 0, bottom: 20 }}>
               <defs>
@@ -102,7 +112,7 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
               </defs>
               <CartesianGrid strokeDasharray="3 6" stroke="rgba(148,163,184,0.18)" vertical={false} />
               <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} interval={0} minTickGap={10} />
-              <YAxis domain={[0, 100]} tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} width={44} />
+              <YAxis domain={[0, yMax]} tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} width={44} />
               <Tooltip content={tooltip} cursor={{ stroke: 'rgba(59,130,246,0.36)', strokeDasharray: '4 4' }} />
               <Legend />
               <Area name="CPU" type="monotone" dataKey="cpu" fill="url(#dashboardCpuArea)" stroke="#6366f1" strokeWidth={2.6} dot={false} />
@@ -117,12 +127,12 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-500">Secondary insight</p>
           <h3 className="mt-1 text-lg font-semibold text-[#111827] dark:text-[#e5e7eb]">Runtime distribution</h3>
         </div>
-        <div className="h-72">
+        <div className="h-64 md:h-72">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={statusData} margin={{ top: 10, right: 18, left: 0, bottom: 10 }}>
               <CartesianGrid strokeDasharray="3 6" stroke="rgba(148,163,184,0.16)" vertical={false} />
               <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} />
-              <YAxis allowDecimals={false} tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} width={44} />
+              <YAxis allowDecimals={false} domain={[0, statusYMax]} tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} width={44} />
               <Tooltip content={tooltip} cursor={{ fill: 'rgba(59,130,246,0.06)' }} />
               <Bar name="Containers" dataKey="count" radius={[8, 8, 0, 0]} fill="#3b82f6" />
               <Line name="Health index" dataKey="count" stroke="#a855f7" strokeWidth={2} dot={false} />
