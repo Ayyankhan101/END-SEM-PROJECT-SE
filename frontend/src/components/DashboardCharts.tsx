@@ -27,7 +27,7 @@ interface FleetPoint {
 function getMetricValue(container: Container, key: 'cpu_percent' | 'memory_percent', fallback: number) {
   const value = (container as any)[key]
   const realValue = typeof value === 'number' && Number.isFinite(value) ? Number(value.toFixed(1)) : 0
-  return realValue > 0 ? realValue : fallback
+  return realValue > 0 ? realValue : (fallback > 0 ? Math.max(fallback, 0.01) : 0)
 }
 
 export default function DashboardCharts({ containers }: DashboardChartsProps) {
@@ -35,9 +35,9 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
   const chartData: FleetPoint[] = source.length
     ? source.map((container, index) => ({
         name: container.name || container.id.slice(0, 8),
-        cpu: getMetricValue(container, 'cpu_percent', container.status === 'running' ? 18 + (index % 5) * 7 : 0),
-        memory: getMetricValue(container, 'memory_percent', container.status === 'running' ? 28 + (index % 4) * 9 : 0),
-        statusScore: container.status === 'running' ? 100 : 18
+        cpu: getMetricValue(container, 'cpu_percent', 0),
+        memory: getMetricValue(container, 'memory_percent', 0),
+        statusScore: container.status === 'running' ? 100 : 0
       }))
     : [
         { name: 'No containers', cpu: 0, memory: 0, statusScore: 0 }
