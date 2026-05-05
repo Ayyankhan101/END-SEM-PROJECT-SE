@@ -303,3 +303,7 @@ def create_initial_user():
         logger.warning("Username: admin")
         logger.warning("Password: %s", password)
         logger.warning("=" * 60)
+        logger.warning("INITIAL USER CREATED - PASSWORD CHANGE REQUIRED")
+        logger.warning("Username: admin")
+        logger.warning("Password: %s", password)
+        logger.warning("=" * 60)
