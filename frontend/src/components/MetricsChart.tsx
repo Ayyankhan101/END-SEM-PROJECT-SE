@@ -73,6 +73,8 @@ function MetricsChart({ data = [], title = 'Metrics' }: MetricsChartProps) {
   const latest = chartData[chartData.length - 1]
   const peakCpu = hasData ? Math.max(...chartData.map(point => point.cpu)) : 0
   const peakMemory = hasData ? Math.max(...chartData.map(point => point.memory)) : 0
+  const maxValue = Math.max(peakCpu, peakMemory)
+  const yDomain: [number, number] = [0, Math.max(100, Math.ceil(maxValue * 1.2 / 10) * 10)]
   const avgLoad = hasData
     ? chartData.reduce((sum, point) => sum + point.ioLoad, 0) / chartData.length
     : 0
@@ -177,7 +179,7 @@ function MetricsChart({ data = [], title = 'Metrics' }: MetricsChartProps) {
                   padding={{ left: 18, right: 18 }}
                 />
                 <YAxis
-                  domain={[0, 100]}
+domain={yDomain}
                   tick={axisText}
                   tickFormatter={(value) => `${Math.round(Number(value))}%`}
                   tickLine={false}

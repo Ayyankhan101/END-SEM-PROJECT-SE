@@ -45,6 +45,9 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
 
   const running = containers.filter(container => container.status === 'running').length
   const stopped = Math.max(containers.length - running, 0)
+  const maxCpuVal = Math.max(...chartData.map(p => p.cpu))
+  const maxMemVal = Math.max(...chartData.map(p => p.memory))
+  const yDomain: [number, number] = [0, Math.max(100, Math.ceil(Math.max(maxCpuVal, maxMemVal) * 1.2 / 10) * 10)]
   const statusData = [
     { name: 'Running', count: running },
     { name: 'Stopped', count: stopped }
@@ -103,7 +106,7 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
               </defs>
               <CartesianGrid strokeDasharray="3 6" stroke="rgba(148,163,184,0.18)" vertical={false} />
               <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} interval={0} minTickGap={10} />
-              <YAxis domain={[0, 100]} tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} width={44} />
+              <YAxis domain={yDomain} tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} width={44} />
               <Tooltip content={tooltip} cursor={{ stroke: 'rgba(59,130,246,0.36)', strokeDasharray: '4 4' }} />
               <Legend />
               <Area name="CPU" type="monotone" dataKey="cpu" fill="url(#dashboardCpuArea)" stroke="#6366f1" strokeWidth={2.6} dot={false} />
