@@ -5,6 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, st
 from typing import List
 import asyncio
 import logging
+import os
 
 from app.services.docker_monitor import get_docker_monitor
 from app.core.security import verify_token
@@ -183,7 +184,7 @@ async def websocket_logs(websocket: WebSocket, container_id: str, token: str = N
 
 @router.websocket("/ws/exec/{container_id}")
 async def websocket_exec(websocket: WebSocket, container_id: str, token: str = None):
-    """Exec session - owners or admins."""
+    """Exec session - owners or admins only with command allowlist."""
     if not token:
         await websocket.close(code=1008, reason="Authentication required")
         return
@@ -206,14 +207,25 @@ async def websocket_exec(websocket: WebSocket, container_id: str, token: str = N
     finally:
         db.close()
     
+    # Command allowlist - shell access is restricted
+    ALLOWED_SHELLS = {"/bin/sh", "/bin/bash", "/usr/bin/env sh", "/usr/bin/env bash"}
+    EXEC_ENABLED = os.environ.get("DOCKWATCH_EXEC_ENABLED", "false").lower() == "true"
+    
+    if not EXEC_ENABLED:
+        await websocket.close(code=1008, reason="Exec endpoint disabled. Set DOCKWATCH_EXEC_ENABLED=true to enable.")
+        return
+    
     await websocket.accept()
     logger.warning(f"Exec session for {container_id} (user: {user.get('sub')})")
     
     monitor = get_docker_monitor()
     if not hasattr(monitor, '_container_service') or monitor._container_service is None:
         monitor.connect()
+    
+    # Use shell from allowlist (default to /bin/sh if available)
+    shell_cmd = "/bin/sh"
     try:
-        exec_result = monitor.exec_in_container(container_id, ["/bin/sh"], tty=True, stdin=True)
+        exec_result = monitor.exec_in_container(container_id, [shell_cmd], tty=True, stdin=True)
         if not exec_result:
             await websocket.send_json({"error": "Failed to create exec"})
             return

@@ -24,18 +24,18 @@ services:
   # 1. Uncomment this service
   # 2. Change backend DOCKWATCH_DOCKER_SOCKET to http://docker-proxy:2375
   # 3. Change backend volume mount to omit /var/run/docker.sock
-  # docker-proxy:
-  #   image: tecnativa/docker-socket-proxy
-  #   environment:
-  #     - CONTAINERS=1
-  #     - IMAGES=1
-  #     - NETWORKS=1
-  #     - VOLUMES=1
-  #     - POST=1
-  #     - DELETE=1
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #   restart: unless-stopped
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - NETWORKS=1
+      - VOLUMES=1
+      - POST=1
+      - DELETE=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
 
   backend:
     build:
@@ -54,6 +54,7 @@ services:
       - DOCKWATCH_DB_URL=postgresql://dockwatch:${DOCKWATCH_DB_PASSWORD:-changeme}@postgres:5432/dockwatch
       - DOCKWATCH_DOCKER_SOCKET=unix:///var/run/docker.sock
       - DOCKWATCH_JWT_SECRET=${DOCKWATCH_JWT_SECRET}
+      - DOCKWATCH_ENCRYPTION_KEY=${DOCKWATCH_ENCRYPTION_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3001,http://localhost:5173}
       - AI_PROVIDER=${AI_PROVIDER:-groq}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://localhost:11434}
@@ -68,7 +69,7 @@ services:
       - TOGETHER_MODEL=${TOGETHER_MODEL:-meta-llama/Llama-3.1-8B-Instruct-Turbo}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-70b-versatile}
-    user: "0:0"  # Run as root to access Docker socket
+    # user: "0:0"  # Removed - use docker-proxy service instead for security
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
