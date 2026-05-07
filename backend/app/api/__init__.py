@@ -7,3 +7,5 @@ from app.api.docker_resources import router as docker_resources
 from app.api.health import router as health
 from app.api.ai import router as ai
 from app.api.metrics import router as metrics
+from app.api.trivy import router as trivy
+from app.api.webhooks import router as webhooks

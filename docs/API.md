@@ -1029,3 +1029,148 @@ Get audit statistics.
   "detail": "Failed to restart container"
 }
 ```
+
+---
+
+## Resource Summary & Cost Analysis
+
+### GET /metrics/summary
+
+Get resource usage summary across all containers. Returns cost and waste analysis.
+
+**Response:**
+```json
+{
+  "total_containers": 10,
+  "running_containers": 7,
+  "stopped_containers": 3,
+  "total_cpu_usage": 45.2,
+  "total_memory_usage": 2147483648,
+  "total_memory_limit": 4294967296,
+  "memory_waste_percent": 35.5,
+  "potential_savings": 12.5,
+  "idle_containers": [
+    {
+      "container_id": "abc123",
+      "name": "dev-container",
+      "cpu_percent": 0.5,
+      "memory_percent": 2.1
+    }
+  ],
+  "high_usage_containers": [
+    {
+      "container_id": "def456",
+      "name": "production-api",
+      "status": "running",
+      "cpu_percent": 85.3,
+      "memory_percent": 72.8
+    }
+  ]
+}
+```
+
+---
+
+### GET /metrics/export
+
+Export metrics data in JSON or CSV format.
+
+**Query Parameters:**
+| Parameter | Type | Default | Description |
+|-----------|------|---------|--------------|
+| container_id | string | all | Filter by container |
+| hours | int | 24 | Time range |
+| format | string | json | json or csv |
+
+**Response (JSON):**
+```json
+{
+  "format": "json",
+  "data": [
+    {
+      "container_id": "abc123",
+      "cpu_percent": 45.2,
+      "memory_percent": 68.5,
+      "memory_usage": 29360128,
+      "timestamp": "2024-01-01T00:00:00"
+    }
+  ],
+  "count": 100
+}
+```
+
+**Response (CSV):**
+```json
+{
+  "format": "csv",
+  "data": "container_id,cpu_percent,memory_percent,memory_usage,timestamp\nabc123,45.2,68.5,29360128,2024-01-01T00:00:00",
+  "filename": "metrics_all_24h.csv"
+}
+```
+
+---
+
+### GET /containers (with search)
+
+List containers with optional search filter.
+
+**Query Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| search | string | Search by name/image/ID |
+| status_filter | string | Filter by status (running/stopped) |
+
+**Response:** List of Container objects
+
+---
+
+## Trivy CVE Scanner
+
+### GET /trivy/scan/{container_id}
+
+Scan a container for vulnerabilities using Trivy.
+
+**Response:**
+```json
+{
+  "image": "nginx:latest",
+  "vulnerabilities": [
+    {
+      "vuln_id": "CVE-2023-1234",
+      "severity": "CRITICAL",
+      "title": "Buffer overflow in nginx",
+      "package": "nginx",
+      "installed_version": "1.24.0",
+      "fixed_version": "1.25.0",
+      "description": "Buffer overflow allows remote code execution"
+    }
+  ],
+  "critical_count": 2,
+  "high_count": 5,
+  "medium_count": 12,
+  "low_count": 8,
+  "total_count": 27
+}
+```
+
+---
+
+### GET /trivy/scan/image/{image_name}
+
+Scan an image by name without running container.
+
+**Example:** `/api/trivy/scan/image/nginx:latest`
+
+---
+
+### GET /trivy/health
+
+Check Trivy availability.
+
+**Response:**
+```json
+{
+  "available": true,
+  "image": "aquasec/trivy:latest",
+  "description": "Trivy CVE scanner for container security"
+}

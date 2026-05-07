@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext, useRef, useCallback } from 'react'
+import { useState, useEffect, createContext, useContext, useRef, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 // App configuration constants
@@ -9,24 +9,27 @@ const CONFIG = {
   RECONNECT_BASE_DELAY_MS: 1000,
 }
 
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import ContainerDetail from './pages/ContainerDetail'
-import ContainerCreate from './pages/ContainerCreate'
-import Stacks from './pages/Stacks'
-import Hosts from './pages/Hosts'
-import Alerts from './pages/Alerts'
-import Settings from './pages/Settings'
-import AuditLogs from './pages/AuditLogs'
-import Notifications from './pages/Notifications'
-import Backup from './pages/Backup'
-import DockerResources from './pages/DockerResources'
-import Users from './pages/Users'
-import TerminalPage from './pages/Terminal'
-import AlertRules from './pages/AlertRules'
-import ContainerCompare from './pages/ContainerCompare'
-import Schedules from './pages/Schedules'
-import AIInsights from './pages/AIInsights'
+// Lazy load pages for code splitting
+const Login = lazy(() => import('./pages/Login'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const ContainerDetail = lazy(() => import('./pages/ContainerDetail'))
+const ContainerCreate = lazy(() => import('./pages/ContainerCreate'))
+const Stacks = lazy(() => import('./pages/Stacks'))
+const Hosts = lazy(() => import('./pages/Hosts'))
+const Alerts = lazy(() => import('./pages/Alerts'))
+const Settings = lazy(() => import('./pages/Settings'))
+const AuditLogs = lazy(() => import('./pages/AuditLogs'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const Backup = lazy(() => import('./pages/Backup'))
+const DockerResources = lazy(() => import('./pages/DockerResources'))
+const Users = lazy(() => import('./pages/Users'))
+const TerminalPage = lazy(() => import('./pages/Terminal'))
+const AlertRules = lazy(() => import('./pages/AlertRules'))
+const ContainerCompare = lazy(() => import('./pages/ContainerCompare'))
+const Schedules = lazy(() => import('./pages/Schedules'))
+const AIInsights = lazy(() => import('./pages/AIInsights'))
+const Security = lazy(() => import('./pages/Security'))
+const Topology3D = lazy(() => import('./pages/Topology3D'))
 import ErrorBoundary from './components/ErrorBoundary'
 
 type Theme = 'light' | 'dark' | 'pink' | 'system'
@@ -158,12 +161,12 @@ function App() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const wsUrl = `${wsProtocol}//${window.location.host}/ws/metrics?token=${token}`
 
-    console.log('Connecting to WebSocket:', wsUrl)
+    // WebSocket connection handling in useEffect
     const ws = new WebSocket(wsUrl)
     socketRef.current = ws
 
     ws.onopen = () => {
-      console.log('WebSocket connected')
+      
       setIsConnected(true)
       setSocket(ws)
       reconnectAttemptRef.current = 0  // Reset backoff counter on successful connect
@@ -218,7 +221,7 @@ function App() {
     }
 
     ws.onclose = () => {
-      console.log('WebSocket disconnected')
+      
       setSocket(null)
       if (heartbeatIntervalRef.current) {
         clearInterval(heartbeatIntervalRef.current)
@@ -226,7 +229,7 @@ function App() {
       
       // Check if max retries exceeded - fallback to polling
       if (reconnectAttemptRef.current >= MAX_WS_RETRIES - 1) {
-        console.log(`WebSocket failed after ${MAX_WS_RETRIES} attempts, using polling fallback`)
+        
         setWsFailed(true)
         setIsConnected(false)  // Use polling instead
         return
@@ -238,7 +241,7 @@ function App() {
         30000
       )
       reconnectAttemptRef.current += 1
-      console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptRef.current})`)
+      
       reconnectTimeoutRef.current = setTimeout(connectSocket, delay)
     }
 
@@ -291,27 +294,31 @@ function App() {
     <ErrorBoundary>
       <AuthContext.Provider value={{ token, userId, login, logout, socket, containers, setContainers, alerts, setAlerts, isConnected, theme, resolvedTheme, setTheme, toggleTheme }}>
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={!token ? <Login /> : <Navigate to="/" />} />
-            <Route path="/" element={token ? <Dashboard /> : <Navigate to="/login" />} />
-            <Route path="/containers" element={token ? <Dashboard /> : <Navigate to="/login" />} />
-            <Route path="/container/:id" element={token ? <ContainerDetail /> : <Navigate to="/login" />} />
-            <Route path="/containers/new" element={token ? <ContainerCreate /> : <Navigate to="/login" />} />
-            <Route path="/stacks" element={token ? <Stacks /> : <Navigate to="/login" />} />
-            <Route path="/hosts" element={token ? <Hosts /> : <Navigate to="/login" />} />
-            <Route path="/alerts" element={token ? <Alerts /> : <Navigate to="/login" />} />
-            <Route path="/settings" element={token ? <Settings /> : <Navigate to="/login" />} />
-            <Route path="/audit" element={token ? <AuditLogs /> : <Navigate to="/login" />} />
-            <Route path="/notifications" element={token ? <Notifications /> : <Navigate to="/login" />} />
-            <Route path="/backup" element={token ? <Backup /> : <Navigate to="/login" />} />
-            <Route path="/docker" element={token ? <DockerResources /> : <Navigate to="/login" />} />
-            <Route path="/users" element={token ? <Users /> : <Navigate to="/login" />} />
-            <Route path="/container/:id/terminal" element={token ? <TerminalPage /> : <Navigate to="/login" />} />
-            <Route path="/alert-rules" element={token ? <AlertRules /> : <Navigate to="/login" />} />
-            <Route path="/compare" element={token ? <ContainerCompare /> : <Navigate to="/login" />} />
-            <Route path="/schedules" element={token ? <Schedules /> : <Navigate to="/login" />} />
-            <Route path="/ai" element={token ? <AIInsights /> : <Navigate to="/login" />} />
-          </Routes>
+          <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div></div>}>
+            <Routes>
+              <Route path="/login" element={!token ? <Login /> : <Navigate to="/" />} />
+              <Route path="/" element={token ? <Dashboard /> : <Navigate to="/login" />} />
+              <Route path="/containers" element={token ? <Dashboard /> : <Navigate to="/login" />} />
+              <Route path="/container/:id" element={token ? <ContainerDetail /> : <Navigate to="/login" />} />
+              <Route path="/containers/new" element={token ? <ContainerCreate /> : <Navigate to="/login" />} />
+              <Route path="/stacks" element={token ? <Stacks /> : <Navigate to="/login" />} />
+              <Route path="/hosts" element={token ? <Hosts /> : <Navigate to="/login" />} />
+              <Route path="/alerts" element={token ? <Alerts /> : <Navigate to="/login" />} />
+              <Route path="/settings" element={token ? <Settings /> : <Navigate to="/login" />} />
+              <Route path="/audit" element={token ? <AuditLogs /> : <Navigate to="/login" />} />
+              <Route path="/notifications" element={token ? <Notifications /> : <Navigate to="/login" />} />
+              <Route path="/backup" element={token ? <Backup /> : <Navigate to="/login" />} />
+              <Route path="/docker" element={token ? <DockerResources /> : <Navigate to="/login" />} />
+              <Route path="/users" element={token ? <Users /> : <Navigate to="/login" />} />
+              <Route path="/container/:id/terminal" element={token ? <TerminalPage /> : <Navigate to="/login" />} />
+              <Route path="/alert-rules" element={token ? <AlertRules /> : <Navigate to="/login" />} />
+              <Route path="/compare" element={token ? <ContainerCompare /> : <Navigate to="/login" />} />
+              <Route path="/schedules" element={token ? <Schedules /> : <Navigate to="/login" />} />
+              <Route path="/ai" element={token ? <AIInsights /> : <Navigate to="/login" />} />
+              <Route path="/security" element={token ? <Security /> : <Navigate to="/login" />} />
+              <Route path="/topology" element={token ? <Topology3D /> : <Navigate to="/login" />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </AuthContext.Provider>
     </ErrorBoundary>

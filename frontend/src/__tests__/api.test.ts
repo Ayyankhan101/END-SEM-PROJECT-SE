@@ -1,17 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as apiModule from '../services/api'
 
+// Mock localStorage
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+Object.defineProperty(window, 'localStorage', { value: localStorageMock })
+
 describe('ApiClient', () => {
-  let consoleErrorSpy: any
-
   beforeEach(() => {
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    localStorage.clear()
-  })
-
-  afterEach(() => {
-    consoleErrorSpy.mockRestore()
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   describe('API contract', () => {

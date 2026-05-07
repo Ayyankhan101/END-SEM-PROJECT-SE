@@ -134,8 +134,12 @@ class ApiClient {
   }
 
   // Container endpoints
-  async getContainers(): Promise<Container[]> {
-    const response = await this.client.get<Container[]>('/containers')
+  async getContainers(search?: string, statusFilter?: string): Promise<Container[]> {
+    const params = new URLSearchParams()
+    if (search) params.append('search', search)
+    if (statusFilter) params.append('status_filter', statusFilter)
+    const query = params.toString() ? `?${params}` : ''
+    const response = await this.client.get<Container[]>(`/containers${query}`)
     return response.data
   }
 
@@ -583,6 +587,47 @@ class ApiClient {
 
   async getAIRemediation(containerId: string): Promise<any> {
     const response = await this.client.get(`/ai/remediation/${containerId}`)
+    return response.data
+  }
+
+  // Resource summary endpoint
+  async getResourceSummary(): Promise<{
+    total_containers: number;
+    running_containers: number;
+    stopped_containers: number;
+    total_cpu_usage: number;
+    total_memory_usage: number;
+    total_memory_limit: number;
+    memory_waste_percent: number;
+    potential_savings: number;
+    idle_containers: Array<{ container_id: string; name: string; cpu_percent: number; memory_percent: number }>;
+    high_usage_containers: Array<{ container_id: string; name: string; status: string; cpu_percent: number; memory_percent: number }>;
+  }> {
+    const response = await this.client.get('/metrics/summary')
+    return response.data
+  }
+
+  // Export metrics
+  async exportMetrics(containerId?: string, hours: number = 24, format: 'json' | 'csv' = 'json'): Promise<any> {
+    const params = new URLSearchParams({ hours: hours.toString(), format })
+    if (containerId) params.append('container_id', containerId)
+    const response = await this.client.get(`/metrics/export?${params}`)
+    return response.data
+  }
+
+  // Trivy CVE scanner endpoints
+  async scanContainerVulnerabilities(containerId: string): Promise<any> {
+    const response = await this.client.get(`/trivy/scan/${containerId}`)
+    return response.data
+  }
+
+  async scanImageVulnerabilities(imageName: string): Promise<any> {
+    const response = await this.client.get(`/trivy/scan/image/${encodeURIComponent(imageName)}`)
+    return response.data
+  }
+
+  async getTrivyHealth(): Promise<any> {
+    const response = await this.client.get('/trivy/health')
     return response.data
   }
 }

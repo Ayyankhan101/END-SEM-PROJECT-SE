@@ -31,6 +31,8 @@ from app.api import (
     health,
     ai,
     metrics,
+    trivy,
+    webhooks,
 )
 from app.db.models import init_db
 from app.services.docker_monitor import get_docker_monitor
@@ -162,6 +164,8 @@ app.include_router(docker_resources, prefix="/api")
 app.include_router(health, prefix="/api")
 app.include_router(ai, prefix="/api")
 app.include_router(metrics, prefix="/api")
+app.include_router(trivy, prefix="/api")
+app.include_router(webhooks, prefix="/api")
 
 
 @app.get("/")

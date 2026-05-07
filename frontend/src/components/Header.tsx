@@ -9,6 +9,7 @@ import {
   Layers,
   LogOut,
   Menu,
+  Network,
   RefreshCw,
   Server,
   Settings,
@@ -40,6 +41,8 @@ const navItems = [
   { path: '/docker', label: 'Docker', icon: Container },
   { path: '/compare', label: 'Compare', icon: RefreshCw },
   { path: '/ai', label: 'AI Insights', icon: Brain },
+  { path: '/topology', label: 'Topology', icon: Network },
+  { path: '/security', label: 'Security', icon: ShieldCheck },
   { path: '/settings', label: 'Settings', icon: Settings },
 ]
 

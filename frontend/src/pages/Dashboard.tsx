@@ -26,13 +26,21 @@ import {
   Square as SquareIcon,
   Users as UsersIcon,
   AlertCircle,
-  Brain
+  Brain,
+  TrendingDown,
+  DollarSign,
+  Download
 } from 'lucide-react'
 import ContainerCard from '@/components/ContainerCard'
 import Header from '@/components/Header'
 import DashboardCharts from '@/components/DashboardCharts'
 import ThreeLoginBackground from '@/components/ThreeLoginBackground'
 import type { Container as ContainerType } from '@/types'
+import { formatSize } from '@/utils/format'
+
+function formatBytes(bytes: number): string {
+  return formatSize(bytes)
+}
 
 interface Stats {
   total: number;
@@ -78,6 +86,8 @@ function Dashboard() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false)
   const [bulkLoading, setBulkLoading] = useState<boolean>(false)
+  const [resourceSummary, setResourceSummary] = useState<any>(null)
+  const [exportLoading, setExportLoading] = useState<boolean>(false)
   const [stats, setStats] = useState<Stats>({ 
     total: 0, 
     running: 0, 
@@ -85,12 +95,20 @@ function Dashboard() {
     alerts: alerts?.length || 0 
   })
 
+  const fetchResourceSummary = useCallback(async () => {
+    try {
+      const summary = await api.getResourceSummary()
+      setResourceSummary(summary)
+    } catch (err) {
+      console.error('Error fetching resource summary:', err)
+    }
+  }, [])
+
   const fetchContainers = useCallback(async () => {
     try {
-      // Get initial container list - used once on app start
       const data = await api.getContainers() as unknown
       const containerList = Array.isArray(data) ? data : (data as Record<string, any>)?.containers || []
-      console.log('Initial load - containers:', containerList.length)
+      
       
       setContainers(containerList)
       setStats({
@@ -113,7 +131,8 @@ function Dashboard() {
   // Initial load once, then WebSocket handles real-time CPU updates
   useEffect(() => {
     fetchContainers()
-  }, [fetchContainers])
+    fetchResourceSummary()
+  }, [fetchContainers, fetchResourceSummary])
 
   const filteredContainers = useMemo(() => 
     Array.isArray(containers) 
@@ -137,7 +156,7 @@ const avgCpuRaw = (
     ((Array.isArray(containers) ? containers : []).length || 1)
   )
   const avgCpu = Math.max(Number(avgCpuRaw.toFixed(2)), 0.01)
-  console.log('avgCpuRaw:', avgCpuRaw, 'containers:', containers.length, 'cpu values:', containers.map(c => c.cpu_percent))
+  // avgCpu calculation without logging
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -209,6 +228,34 @@ const avgCpuRaw = (
       console.error('Bulk delete failed:', err)
     } finally {
       setBulkLoading(false)
+    }
+  }
+
+  const handleExport = async (format: 'json' | 'csv') => {
+    setExportLoading(true)
+    try {
+      const result = await api.exportMetrics(undefined, 24, format)
+      if (format === 'json') {
+        const blob = new Blob([JSON.stringify(result.jsonData || result.data, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = result.filename || 'metrics.json'
+        a.click()
+        URL.revokeObjectURL(url)
+      } else {
+        const blob = new Blob([result.csvData || result.data], { type: 'text/csv' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = result.filename || 'metrics.csv'
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch (err) {
+      console.error('Export failed:', err)
+    } finally {
+      setExportLoading(false)
     }
   }
 
@@ -292,6 +339,39 @@ const avgCpuRaw = (
           />
         </div>
 
+        {resourceSummary && (
+          <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <DashboardMetricCard
+              label="Memory Waste"
+              value={`${resourceSummary.memory_waste_percent || 0}%`}
+              detail={`${resourceSummary.idle_containers?.length || 0} idle containers`}
+              icon={<TrendingDown className="h-5 w-5" />}
+              accent="border-amber-500/25 bg-amber-500/10 text-amber-500"
+            />
+            <DashboardMetricCard
+              label="Potential Savings"
+              value={`$${(resourceSummary.potential_savings || 0).toFixed(2)}`}
+              detail="From idle resources"
+              icon={<DollarSign className="h-5 w-5" />}
+              accent="border-green-500/25 bg-green-500/10 text-green-500"
+            />
+            <DashboardMetricCard
+              label="CPU Usage"
+              value={`${resourceSummary.total_cpu_usage?.toFixed(1) || 0}%`}
+              detail="Total across running"
+              icon={<Activity className="h-5 w-5" />}
+              accent="border-blue-500/25 bg-blue-500/10 text-blue-500"
+            />
+            <DashboardMetricCard
+              label="Memory Used"
+              value={formatBytes(resourceSummary.total_memory_usage || 0)}
+              detail={`of ${formatBytes(resourceSummary.total_memory_limit || 0)}`}
+              icon={<HardDrive className="h-5 w-5" />}
+              accent="border-purple-500/25 bg-purple-500/10 text-purple-500"
+            />
+          </div>
+        )}
+
         <DashboardCharts containers={Array.isArray(containers) ? containers : []} />
 
         <div className="dashboard-card mb-6">
@@ -343,6 +423,29 @@ const avgCpuRaw = (
             >
               Favorites
             </button>
+            <div className="relative group">
+              <button
+                disabled={exportLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#e5e7eb] bg-white px-4 py-2.5 text-sm font-semibold text-[#6b7280] transition hover:bg-blue-50 hover:text-[#111827] dark:border-[#374151] dark:bg-[#111827] dark:text-[#d1d5db] dark:hover:bg-[#1f2937] disabled:opacity-50"
+              >
+                <Download className="h-4 w-4" />
+                Export
+              </button>
+              <div className="absolute right-0 top-full mt-1 hidden w-32 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg group-hover:block dark:border-[#374151] dark:bg-[#1f2937]">
+                <button
+                  onClick={() => handleExport('json')}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                >
+                  JSON
+                </button>
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
+                >
+                  CSV
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

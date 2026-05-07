@@ -427,6 +427,8 @@ async def list_containers(
     request: Request,
     favorites: bool = False,
     show_all: bool = True,
+    search: str = None,
+    status_filter: str = None,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -436,8 +438,6 @@ async def list_containers(
     ensure_docker_connected(monitor)
     
     query = db.query(Container)
-    # Show all containers by default (matching AI Insights)
-    # Set show_all=False to filter by user ownership
     if not show_all:
         if get_user_role(current_user) != "admin":
             user_id = current_user.get("user_id")
@@ -447,6 +447,19 @@ async def list_containers(
     if favorites:
         query = query.filter(Container.is_favorite == 1)
     containers = query.all()
+    
+    if search:
+        search_lower = search.lower()
+        containers = [
+            c for c in containers
+            if search_lower in (c.name or "").lower()
+            or search_lower in (c.image or "").lower()
+            or search_lower in (c.id or "").lower()
+        ]
+    
+    if status_filter:
+        containers = [c for c in containers if c.status == status_filter]
+    
     return containers
 
 
