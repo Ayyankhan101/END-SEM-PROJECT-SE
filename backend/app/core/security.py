@@ -305,24 +305,18 @@ def require_role(required_role: str):
 
 
 def create_initial_user():
-    import secrets
     from app.db import get_db
     from app.db.models import User
 
     db = next(get_db())
     existing = db.query(User).first()
     if not existing:
-        password = secrets.token_urlsafe(12)
         user = User(
             username="admin",
-            hashed_password=get_password_hash(password),
+            hashed_password=get_password_hash("admin123"),
             role="admin",
-            must_change_password=True,
+            must_change_password=0,
         )
         db.add(user)
         db.commit()
-        logger.warning("=" * 60)
-        logger.warning("INITIAL USER CREATED - PASSWORD CHANGE REQUIRED")
-        logger.warning("Username: admin")
-        logger.warning("Password: %s", password)
-        logger.warning("=" * 60)
+        logger.info("Initial admin user created — username: admin / password: admin123")
