@@ -61,19 +61,31 @@ export default function Topology() {
     const scene = new THREE.Scene()
     scene.fog = new THREE.FogExp2(0x0a0a0f, 0.08)
 
-    const camera = new THREE.PerspectiveCamera(60, mount.clientWidth / mount.clientHeight, 0.1, 100)
+    // Lights — required for Phong/Lambert materials
+    const ambient = new THREE.AmbientLight(0xffffff, 0.4)
+    scene.add(ambient)
+    const pointLight1 = new THREE.PointLight(0x4488ff, 2, 20)
+    pointLight1.position.set(5, 5, 5)
+    scene.add(pointLight1)
+    const pointLight2 = new THREE.PointLight(0xff4488, 1.5, 20)
+    pointLight2.position.set(-5, -3, -5)
+    scene.add(pointLight2)
+
+    const w = mount.clientWidth
+    const h = mount.clientHeight || 400
+    const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 100)
     camera.position.set(0, 3, 8)
     camera.lookAt(0, 0, 0)
 
     let renderer: THREE.WebGLRenderer
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true })
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     } catch (e) {
       return
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.setSize(mount.clientWidth, mount.clientHeight)
-    renderer.setClearColor(0x0a0a0f)
+    renderer.setSize(w, h)
+    renderer.setClearColor(0x0a0a0f, 1)
     mount.appendChild(renderer.domElement)
 
     const runningContainers = containerNodes.filter(c => c.status === 'running')
@@ -82,24 +94,19 @@ export default function Topology() {
 
     runningContainers.forEach((container, index) => {
       const geo = new THREE.SphereGeometry(0.3, 32, 32)
-      
       const cpu = container.cpu || 0
       const color = cpu > 75 ? 0xff4444 : cpu > 50 ? 0xffaa44 : cpu > 25 ? 0x44ff88 : 0x44aaff
-      
       const mat = new THREE.MeshPhongMaterial({
         color,
         emissive: new THREE.Color(color).multiplyScalar(0.3),
         shininess: 80
       })
-      
       const mesh = new THREE.Mesh(geo, mat)
-      
       const row = Math.floor(index / spacing)
       const col = index % spacing
       const x = (col - (spacing - 1) / 2) * 1.8
       const z = (row - Math.floor(runningContainers.length / spacing) / 2) * 1.8
       const y = Math.sin(index * 0.5) * 0.3
-      
       mesh.position.set(x, y, z)
       scene.add(mesh)
       nodeMap.set(container.id, mesh)
@@ -110,7 +117,6 @@ export default function Topology() {
         const geo = new THREE.BoxGeometry(0.4, 0.4, 0.4)
         const mat = new THREE.MeshLambertMaterial({ color: 0x666666 })
         const mesh = new THREE.Mesh(geo, mat)
-        
         const row = Math.floor(index / spacing)
         const col = index % spacing
         mesh.position.set(
@@ -122,7 +128,7 @@ export default function Topology() {
       }
     })
 
-    nodeMap.forEach((mesh, id) => {
+    nodeMap.forEach((mesh) => {
       const connected = containerNodes.slice(0, 3)
       connected.forEach((_, i) => {
         const otherMesh = Array.from(nodeMap.values())[i]
@@ -130,16 +136,38 @@ export default function Topology() {
           const points = [mesh.position, otherMesh.position]
           const curve = new THREE.LineCurve3(points[0], points[1])
           const tubeGeo = new THREE.TubeGeometry(curve, 8, 0.02, 4, false)
-          const tubeMat = new THREE.MeshBasicMaterial({ 
-            color: 0x4466aa, 
-            transparent: true, 
-            opacity: 0.3 
-          })
-          const tube = new THREE.Mesh(tubeGeo, tubeMat)
-          scene.add(tube)
+          const tubeMat = new THREE.MeshBasicMaterial({ color: 0x4466aa, transparent: true, opacity: 0.3 })
+          scene.add(new THREE.Mesh(tubeGeo, tubeMat))
         }
       })
     })
+
+    // Render loop
+    let animId: number
+    const animate = () => {
+      animId = requestAnimationFrame(animate)
+      // Slow orbit rotation
+      scene.rotation.y += 0.003
+      renderer.render(scene, camera)
+    }
+    animate()
+
+    // Resize handler
+    const onResize = () => {
+      const nw = mount.clientWidth
+      const nh = mount.clientHeight || 400
+      camera.aspect = nw / nh
+      camera.updateProjectionMatrix()
+      renderer.setSize(nw, nh)
+    }
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      cancelAnimationFrame(animId)
+      window.removeEventListener('resize', onResize)
+      renderer.dispose()
+      if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
+    }
   }, [containerNodes])
 
   const statusColor = (status: string) => {
@@ -192,19 +220,21 @@ export default function Topology() {
           </div>
         </div>
 
-        <div className="dashboard-card flex-1 min-h-[400px] relative">
-          <h3 className="mb-4 text-lg font-semibold text-[#111827] dark:text-white">
+        <div className="dashboard-card flex-1 flex flex-col min-h-[500px]">
+          <h3 className="mb-2 text-lg font-semibold text-[#111827] dark:text-white">
             3D Cluster View
           </h3>
-          <div ref={mountRef} className="absolute inset-0 w-full min-h-[400px]" />
-          {!loading && containerNodes.length === 0 && (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center text-slate-500">
-                <Network className="mx-auto h-12 w-12" />
-                <p className="mt-4">No containers to visualize</p>
+          <div className="relative flex-1 min-h-[420px] rounded-lg overflow-hidden bg-[#0a0a0f]">
+            <div ref={mountRef} className="w-full h-full" style={{ minHeight: 420 }} />
+            {!loading && containerNodes.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center text-slate-500">
+                  <Network className="mx-auto h-12 w-12" />
+                  <p className="mt-4">No containers to visualize</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </main>
     </div>
