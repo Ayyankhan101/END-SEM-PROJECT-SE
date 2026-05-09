@@ -124,15 +124,16 @@ function Schedules() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <Header 
-        title="Scheduled Actions" 
-        icon={<Clock size={24} />} 
+    <div className="app-surface">
+      <Header
+        title="Scheduled Actions"
+        icon={<Clock size={24} />}
+        onRefresh={fetchData}
         isConnected={isConnected}
         onLogout={logout}
       />
 
-      <div className="p-6">
+      <main className="app-main">
         <div className="flex justify-between items-center mb-6">
           <p className="text-gray-400">Automate container actions at specific times daily</p>
           <button
@@ -276,7 +277,7 @@ function Schedules() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }

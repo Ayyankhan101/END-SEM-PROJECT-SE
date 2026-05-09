@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api from '@/services/api'
+import { api } from '@/services/api'
 import type { AuditLog, AuditStats } from '@/types'
 import Header from '@/components/Header'
 import { FileText } from 'lucide-react'

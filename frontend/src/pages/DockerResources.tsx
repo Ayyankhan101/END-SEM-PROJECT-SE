@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Box, Database, Layers, Network, X } from 'lucide-react'
-import api from '@/services/api'
+import { api } from '@/services/api'
 import type { DockerImage, DockerVolume, DockerNetwork } from '@/types'
 import { formatSize } from '../utils/format'
 import Header from '@/components/Header'

@@ -1,12 +1,12 @@
 import { useEffect, useState, FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
 import { Plus, Trash2, RefreshCw, Server, CheckCircle, XCircle, Play } from 'lucide-react'
+import Header from '@/components/Header'
 import type { Host } from '@/types'
 
 function Hosts() {
-  const { logout } = useAuth() 
+  const { logout, isConnected } = useAuth()
   const [hosts, setHosts] = useState<Host[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [showForm, setShowForm] = useState<boolean>(false)
@@ -85,33 +85,24 @@ function Hosts() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Server className="w-8 h-8 text-blue-500" />
-            <h1 className="text-xl font-bold">Docker Hosts</h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setShowForm(!showForm)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Add Host
-            </button>
-            <Link to="/" className="text-gray-400 hover:text-white">
-              Dashboard
-            </Link>
-            <button onClick={logout} className="text-gray-400 hover:text-white">
-              Logout
-            </button>
-          </div>
-        </div>
-      </header>
+    <div className="app-surface">
+      <Header
+        title="Docker Hosts"
+        icon={<Server size={24} />}
+        isConnected={isConnected}
+        onLogout={logout}
+      />
 
-      <div className="p-6">
+      <main className="app-main">
+        <div className="flex justify-end mb-6">
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm text-white"
+          >
+            <Plus className="w-4 h-4" />
+            {showForm ? 'Cancel' : 'Add Host'}
+          </button>
+        </div>
         {showForm && (
           <div className="bg-gray-800 rounded-lg p-6 mb-6">
             <h2 className="text-lg font-bold mb-4">Add Docker Host</h2>
@@ -237,7 +228,7 @@ function Hosts() {
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }

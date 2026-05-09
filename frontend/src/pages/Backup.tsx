@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api from '@/services/api'
+import { api } from '@/services/api'
 import type { BackupInfo } from '@/types'
 import { formatSize } from '../utils/format'
 import Header from '@/components/Header'

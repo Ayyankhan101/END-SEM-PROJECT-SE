@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api from '@/services/api'
+import { api } from '@/services/api'
 import type { NotificationChannel } from '@/types'
 import Header from '@/components/Header'
 import { Bell } from 'lucide-react'

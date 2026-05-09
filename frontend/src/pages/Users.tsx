@@ -106,16 +106,16 @@ function Users() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      <Header 
-        title="User Management" 
-        icon={<UsersIcon size={24} />} 
+    <div className="app-surface">
+      <Header
+        title="User Management"
+        icon={<UsersIcon size={24} />}
         onRefresh={fetchUsers}
         isConnected={isConnected}
         onLogout={logout}
       />
 
-      <div className="p-6">
+      <main className="app-main">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-medium">Users</h2>
           <button
@@ -290,7 +290,7 @@ function Users() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   )
 }
