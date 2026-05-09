@@ -13,11 +13,18 @@ if [ -z "$DOCKWATCH_JWT_SECRET" ]; then
     export DOCKWATCH_JWT_SECRET=$(openssl rand -hex 32)
 fi
 
+# Generate encryption key if needed
+if [ -z "$DOCKWATCH_ENCRYPTION_KEY" ]; then
+    echo "⚠️  DOCKWATCH_ENCRYPTION_KEY not set. Generating..."
+    export DOCKWATCH_ENCRYPTION_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+fi
+
 # Create .env if missing
 if [ ! -f ".env" ]; then
     echo "⚠️  .env not found. Creating..."
     cat > .env << EOF
 DOCKWATCH_JWT_SECRET=${DOCKWATCH_JWT_SECRET}
+DOCKWATCH_ENCRYPTION_KEY=${DOCKWATCH_ENCRYPTION_KEY}
 CORS_ORIGINS=http://localhost:3001,http://localhost:5173
 DOCKWATCH_DOCKER_SOCKET=/var/run/docker.sock
 EOF
