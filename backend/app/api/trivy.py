@@ -4,6 +4,8 @@ Trivy CVE Scanner API endpoints.
 from fastapi import APIRouter, Depends, HTTPException, status
 import logging
 
+from app.core.security import get_current_user
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/trivy", tags=["security"])
@@ -22,6 +24,7 @@ def ensure_docker_connected(monitor):
 @router.get("/scan/{container_id}")
 async def scan_container_vulnerabilities(
     container_id: str,
+    current_user: dict = Depends(get_current_user),
 ):
     """Scan a container for vulnerabilities using Trivy."""
     from app.services.trivy_scanner import get_trivy_scanner
@@ -38,6 +41,7 @@ async def scan_container_vulnerabilities(
 @router.get("/scan/image/{image_name:path}")
 async def scan_image_vulnerabilities(
     image_name: str,
+    current_user: dict = Depends(get_current_user),
 ):
     """Scan an image for vulnerabilities using Trivy."""
     from app.services.trivy_scanner import get_trivy_scanner
@@ -52,7 +56,7 @@ async def scan_image_vulnerabilities(
 
 
 @router.get("/health")
-async def trivy_health_check():
+async def trivy_health_check(current_user: dict = Depends(get_current_user)):
     """Check if Trivy is available."""
     import subprocess
     

@@ -117,8 +117,10 @@ class User(Base):
     is_2fa_enabled = Column(Integer, default=0)
     backup_codes = Column(String, nullable=True)  # Encrypted JSON list of codes
     must_change_password = Column(Integer, default=0)
+    force_password_change = Column(Integer, default=0)
     failed_login_attempts = Column(Integer, default=0)
     lockout_until = Column(DateTime, nullable=True)
+    tokens_revoked_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

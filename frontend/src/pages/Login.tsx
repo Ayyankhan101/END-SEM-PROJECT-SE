@@ -15,6 +15,9 @@ function Login() {
   const [userId, setUserId] = useState<number | null>(null)
   const [error, setError] = useState<string>('')
   const [isLoading, setIsLoading] = useState<boolean>(false)
+  const [mustChangePassword, setMustChangePassword] = useState<boolean>(false)
+  const [newPassword, setNewPassword] = useState<string>('')
+  const [confirmPassword, setConfirmPassword] = useState<string>('')
   const { login: authLogin } = useAuth()
 
   const handleSubmit = async (e: FormEvent) => {
@@ -34,6 +37,16 @@ function Login() {
         authLogin(data.access_token, currentUserId)
         localStorage.removeItem('pendingUserId')
         navigate('/')
+      } else if (mustChangePassword) {
+        if (newPassword !== confirmPassword) {
+          setError('Passwords do not match')
+          setIsLoading(false)
+          return
+        }
+        await api.changePasswordFirstLogin({ username, old_password: password, new_password: newPassword })
+        const data = await api.login({ username, password: newPassword })
+        authLogin(data.access_token, data.user_id, data.refresh_token)
+        navigate('/')
       } else {
         const data = await api.login({ username, password })
         if (data.requires_2fa) {
@@ -44,15 +57,24 @@ function Login() {
           if (newUserId) {
             localStorage.setItem('pendingUserId', String(newUserId))
           }
+        } else if (data.must_change_password) {
+          setMustChangePassword(true)
+          setIsLoading(false)
         } else {
-          authLogin(data.access_token, data.user_id)
+          authLogin(data.access_token, data.user_id, data.refresh_token)
           localStorage.removeItem('pendingUserId')
           navigate('/')
         }
       }
     } catch (err: any) {
       console.error('Login error:', err)
-      setError(err.response?.data?.detail || err.message || 'Login failed')
+      const detail = err.response?.data?.detail || err.message || 'Login failed'
+      if (err.response?.status === 403 && typeof detail === 'string' && detail.toLowerCase().includes('password must be changed')) {
+        setMustChangePassword(true)
+        setIsLoading(false)
+        return
+      }
+      setError(detail)
     } finally {
       setIsLoading(false)
     }
@@ -125,9 +147,11 @@ function Login() {
 
             <div className="mb-7">
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-500">Welcome back</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#e5e7eb]">{requires2FA ? 'Verify your session' : 'Sign in'}</h2>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#e5e7eb]">
+                {mustChangePassword ? 'Set new password' : requires2FA ? 'Verify your session' : 'Sign in'}
+              </h2>
               <p className="mt-2 text-sm text-[#9ca3af]">
-                {requires2FA ? 'Enter the authentication code from your device.' : 'Use your username and password to continue.'}
+                {mustChangePassword ? 'Your password must be changed before continuing.' : requires2FA ? 'Enter the authentication code from your device.' : 'Use your username and password to continue.'}
               </p>
             </div>
         
@@ -138,7 +162,36 @@ function Login() {
         )}
         
         <form onSubmit={handleSubmit} className="space-y-5">
-          {!requires2FA ? (
+          {mustChangePassword ? (
+            <>
+              <div>
+                <label htmlFor="newPassword" className="mb-2 block text-sm font-medium text-[#e5e7eb]">New Password</label>
+                <input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full rounded-xl border border-[#374151] bg-[#0b1120]/70 px-4 py-3 text-[#e5e7eb] outline-none transition placeholder:text-[#6b7280] focus:border-[#3b82f6] focus:ring-4 focus:ring-[#3b82f6]/20"
+                  placeholder="Enter new password (12+ chars)"
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label htmlFor="confirmPassword" className="mb-2 block text-sm font-medium text-[#e5e7eb]">Confirm Password</label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded-xl border border-[#374151] bg-[#0b1120]/70 px-4 py-3 text-[#e5e7eb] outline-none transition placeholder:text-[#6b7280] focus:border-[#3b82f6] focus:ring-4 focus:ring-[#3b82f6]/20"
+                  placeholder="Confirm new password"
+                  required
+                  autoComplete="new-password"
+                />
+              </div>
+            </>
+          ) : !requires2FA ? (
             <>
               <div>
                 <label htmlFor="username" className="mb-2 block text-sm font-medium text-[#e5e7eb]">Username</label>

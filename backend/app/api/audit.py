@@ -12,6 +12,7 @@ import hashlib
 
 from app.db.models import get_db, AuditLog, User, get_last_audit_hash
 from app.core.security import get_current_user
+from app.api.endpoints import require_admin
 from app.core.validation import validate_string, ValidationError
 from app.core.rate_limiter import limiter
 
@@ -37,7 +38,7 @@ async def get_audit_logs(
     user_id: Optional[int] = Query(None),
     days: int = Query(7, ge=1, le=365),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Get audit logs with filtering and pagination"""
     query = db.query(AuditLog)
@@ -86,7 +87,7 @@ async def get_audit_stats(
     request: Request,
     days: int = Query(7, ge=1, le=365),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin)
 ):
     """Get audit statistics"""
     cutoff_date = datetime.utcnow() - timedelta(days=days)

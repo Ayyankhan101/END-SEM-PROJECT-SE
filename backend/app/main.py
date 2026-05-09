@@ -152,7 +152,9 @@ async def add_security_headers(request, call_next):
     # CSP - allow same origin and websockets
     response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws: wss:"
 
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # Only send HSTS on HTTPS connections
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 app.include_router(endpoints, prefix="/api")

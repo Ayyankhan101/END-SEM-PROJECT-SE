@@ -11,12 +11,13 @@ from datetime import datetime
 from app.db.models import get_db, NotificationChannel, NotificationLog, Alert, User
 from app.core.security import get_current_user
 from app.core.validation import validate_string, validate_json, ValidationError
+from pydantic import BaseModel
 from app.core.rate_limiter import limiter
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
-class NotificationChannelCreate:
+class NotificationChannelCreate(BaseModel):
     name: str
     channel_type: str  # email, webhook, slack, discord
     config: dict
@@ -31,19 +32,25 @@ async def get_notification_channels(
     current_user: User = Depends(get_current_user)
 ):
     """Get all notification channels"""
+    is_admin = current_user.get("role") == "admin"
     channels = db.query(NotificationChannel).all()
-    return [
-        {
+    result = []
+    for c in channels:
+        raw_config = json.loads(c.config)
+        # Non-admins see channel metadata only, not secrets inside config
+        safe_config = raw_config if is_admin else {
+            k: "***" for k in raw_config if any(s in k.lower() for s in ("key", "secret", "token", "password", "url", "webhook"))
+        }
+        result.append({
             "id": c.id,
             "name": c.name,
             "channel_type": c.channel_type,
-            "config": json.loads(c.config),
+            "config": safe_config,
             "is_enabled": bool(c.is_enabled),
             "created_at": c.created_at.isoformat() if c.created_at else None,
-            "updated_at": c.updated_at.isoformat() if c.updated_at else None
-        }
-        for c in channels
-    ]
+            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+        })
+    return result
 
 
 @router.post("/channels")

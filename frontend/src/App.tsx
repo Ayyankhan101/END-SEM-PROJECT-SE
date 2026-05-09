@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 
 // App configuration constants
 const CONFIG = {
-  HEARTBEAT_INTERVAL_MS: 15000,
+  HEARTBEAT_INTERVAL_MS: 30000,
   CONNECTIVITY_CHECK_INTERVAL_MS: 30000,
   RECONNECT_MAX_ATTEMPTS: 10,
   RECONNECT_BASE_DELAY_MS: 1000,
@@ -36,7 +36,7 @@ type Theme = 'light' | 'dark' | 'pink' | 'system'
 
 interface AuthContextType {
   token: string | null;
-  login: (newToken: string, userId?: number) => void;
+  login: (newToken: string, userId?: number, refreshToken?: string) => void;
   logout: () => void;
   socket: WebSocket | null;
   containers: any[];
@@ -71,8 +71,6 @@ const defaultContext: AuthContextType = {
 const AuthContext = createContext<AuthContextType>(defaultContext)
 
 export const useAuth = () => useContext(AuthContext)
-
-const HEARTBEAT_INTERVAL = 30000
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'))
@@ -176,7 +174,7 @@ function App() {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send('ping')
         }
-      }, HEARTBEAT_INTERVAL)
+      }, CONFIG.HEARTBEAT_INTERVAL_MS)
     }
 
     ws.onmessage = (event) => {
@@ -269,18 +267,22 @@ function App() {
     }
   }, [token, connectSocket])
 
-  const login = (newToken: string, newUserId?: number) => {
+  const login = (newToken: string, newUserId?: number, refreshToken?: string) => {
     localStorage.setItem('token', newToken)
     setToken(newToken)
     if (newUserId !== undefined && newUserId !== null) {
       localStorage.setItem('userId', String(newUserId))
       setUserId(newUserId)
     }
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken)
+    }
   }
 
   const logout = () => {
     localStorage.removeItem('token')
     localStorage.removeItem('userId')
+    localStorage.removeItem('refresh_token')
     setToken(null)
     setUserId(null)
     setIsConnected(false)

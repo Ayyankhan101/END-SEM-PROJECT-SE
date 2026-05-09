@@ -78,7 +78,7 @@ def _bulk_container_operation(container_ids: List[str], db: Session, operation: 
 
 
 from app.db.models import get_db
-from app.db.models import Container, Metric, Alert, RecoveryAction, Stack, Host, AlertRule, Schedule
+from app.db.models import Container, Metric, Alert, RecoveryAction, Stack, Host, AlertRule, Schedule, User
 from app.models.schemas import (
     ContainerResponse,
     ContainerDetail,
@@ -107,7 +107,7 @@ from app.models.schemas import (
     ScheduleResponse,
     ExecCreate,
 )
-from app.core.security import create_access_token, verify_password, get_current_user, get_password_hash, get_user_role, create_refresh_token, revoke_token, revoke_all_user_tokens
+from app.core.security import create_access_token, verify_password, get_current_user, get_password_hash, get_user_role, create_refresh_token, revoke_token, revoke_all_user_tokens, verify_token
 from app.core.config import get_config
 from app.core.rate_limiter import limiter
 from app.core.validation import (
@@ -116,10 +116,6 @@ from app.core.validation import (
     validate_image_name,
     validate_positive_int,
 )
-from pydantic import BaseModel
-from fastapi import Depends, HTTPException, status
-
-
 def get_current_user_with_auth(current_user: dict = Depends(get_current_user)):
     """Get current user with additional authorization checks."""
     if not current_user:
@@ -604,11 +600,15 @@ async def get_all_container_stats(
                 ).order_by(Metric.timestamp.desc()).first()
                 
                 if cached_metric:
+                    mem_usage = cached_metric.memory_usage or 0
+                    mem_pct = cached_metric.memory_percent or 0
+                    # Derive limit from usage and percent to avoid storing it separately
+                    mem_limit = int(mem_usage / mem_pct * 100) if mem_pct > 0 else 0
                     stats = {
                         "cpu_percent": cached_metric.cpu_percent or 0,
-                        "memory_percent": cached_metric.memory_percent or 0,
-                        "memory_usage": cached_metric.memory_usage or 0,
-                        "memory_limit": cached_metric.memory_usage or 1
+                        "memory_percent": mem_pct,
+                        "memory_usage": mem_usage,
+                        "memory_limit": mem_limit,
                     }
                 else:
                     stats = None
@@ -1142,7 +1142,7 @@ async def create_host(
     request: Request,
     host: HostCreate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     from app.services.docker_monitor import get_docker_monitor
 
@@ -1168,7 +1168,7 @@ async def delete_host(
     request: Request,
     host_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     host = db.query(Host).filter(Host.id == host_id).first()
     if not host:
@@ -1210,7 +1210,7 @@ async def activate_host(
     request: Request,
     host_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     """Activate a Docker host (switch current connection)."""
     from app.services.docker_monitor import get_docker_monitor
@@ -1253,7 +1253,7 @@ async def update_settings(
     request: Request,
     settings: SettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(require_admin),
 ):
     config = get_config()
 
@@ -1341,6 +1341,7 @@ async def update_container_env(
     request: Request,
     container_id: str,
     env_vars: Dict[str, str],
+    db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
     validated_id = validate_container_id(container_id)
@@ -1581,7 +1582,6 @@ async def list_alert_rules(
             user_id = current_user.get("user_id")
             if user_id is None:
                 raise HTTPException(status_code=403, detail="Invalid user")
-            user_container_ids = db.query(Container.id).filter(Container.user_id == user_id).subquery()
             query = query.filter(
                 (AlertRule.container_id.is_(None)) |
                 (AlertRule.container_id.in_(db.query(Container.id).filter(Container.user_id == user_id)))
@@ -1779,14 +1779,16 @@ async def create_schedule(
     current_user: dict = Depends(get_current_user),
 ):
     from app.db.models import Schedule
-    
-    container = db.query(Container).filter(Container.id == schedule_data.container_id).first()
-    if not container:
-        raise HTTPException(status_code=404, detail="Container not found")
-    
+
+    container = check_container_ownership(db, schedule_data.container_id, current_user)
+
     if schedule_data.action not in ["start", "stop", "restart"]:
         raise HTTPException(status_code=400, detail="Action must be start, stop, or restart")
-    
+
+    import re
+    if not re.match(r"^(?:[01]\d|2[0-3]):[0-5]\d$", schedule_data.time):
+        raise HTTPException(status_code=400, detail="Time must be in HH:MM format (24h)")
+
     schedule = Schedule(
         container_id=schedule_data.container_id,
         action=schedule_data.action,
@@ -2016,8 +2018,6 @@ async def force_change_password(
     return {"status": "success", "message": "Password changed successfully"}
 
 
-from pydantic import BaseModel
-
 class PasswordChangeFirstLoginRequest(BaseModel):
     username: str
     old_password: str
@@ -2090,11 +2090,12 @@ async def change_password_first_login(
             detail="New password must be different from old password"
         )
     
-    # Update password 
+    # Update password and clear forced-change flags
     user.hashed_password = get_password_hash(request_data.new_password)
+    user.must_change_password = 0
     db.commit()
-    
+
     # Revoke all existing tokens for this user
     revoke_all_user_tokens(request_data.username)
-    
+
     return {"status": "success", "message": "Password changed successfully"}

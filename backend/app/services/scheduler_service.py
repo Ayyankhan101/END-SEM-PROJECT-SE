@@ -30,7 +30,7 @@ async def check_and_execute_schedules():
     """Check all enabled schedules and execute if time matches."""
     session = get_session()
     try:
-        now = datetime.now()
+        now = datetime.utcnow()
         current_time = now.strftime("%H:%M")
         current_day = now.strftime("%A")  # e.g., "Monday"
         

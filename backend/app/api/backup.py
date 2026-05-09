@@ -14,9 +14,11 @@ from datetime import datetime
 from pathlib import Path
 
 from app.db.models import get_db, User, Container, Metric, Alert, Stack, Host, Settings
-from app.core.security import get_current_user, encrypt_secret, decrypt_secret, _fernet
+from app.core.security import get_current_user, encrypt_secret, decrypt_secret
+from app.core.security import _fernet
 from app.core.config import get_config
 from app.core.rate_limiter import limiter
+from app.api.endpoints import require_admin
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -64,7 +66,7 @@ async def create_backup(
     background_tasks: BackgroundTasks,
     include_metrics: bool = True,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """Create a new encrypted backup"""
     ensure_backup_dir()
@@ -73,8 +75,8 @@ async def create_backup(
     filename = f"dockwatch_backup_{timestamp}.tar.gz"
     backup_path = BACKUP_DIR / filename
 
-    # Create backup in background
-    background_tasks.add_task(create_backup_archive, backup_path, include_metrics, db)
+    # Create backup in background — pass no session; task opens its own
+    background_tasks.add_task(create_backup_archive, backup_path, include_metrics)
 
     return {
         "status": "pending",
@@ -83,8 +85,10 @@ async def create_backup(
     }
 
 
-def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session):
+def create_backup_archive(backup_path: Path, include_metrics: bool):
     """Create encrypted backup archive"""
+    from app.db.models import get_session
+    db = get_session()
     try:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -178,6 +182,8 @@ def create_backup_archive(backup_path: Path, include_metrics: bool, db: Session)
         if backup_path.exists():
             backup_path.unlink()
         raise e
+    finally:
+        db.close()
 
 
 @router.post("/restore")
@@ -186,7 +192,7 @@ async def restore_backup(
     request: Request,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     """Restore from encrypted backup"""
     try:
@@ -204,9 +210,15 @@ async def restore_backup(
             with open(backup_tar, "wb") as f:
                 f.write(decrypted_data)
 
-            # Extract archive
+            # Extract archive — filter members to prevent path traversal (zip-slip)
             with tarfile.open(backup_tar, "r:gz") as tar:
-                tar.extractall(temp_path)
+                safe_members = []
+                for member in tar.getmembers():
+                    member_path = Path(temp_path) / member.name
+                    if not str(member_path.resolve()).startswith(str(Path(temp_path).resolve())):
+                        raise HTTPException(status_code=400, detail="Malicious backup archive detected")
+                    safe_members.append(member)
+                tar.extractall(temp_path, members=safe_members)
 
             # Load data
             data_file = temp_path / "data.json"

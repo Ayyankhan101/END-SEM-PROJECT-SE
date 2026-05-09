@@ -129,8 +129,8 @@ async def websocket_health(websocket: WebSocket, token: str = None):
         logger.warning(f"WS health auth failed: {e}")
         return
     
-    await manager.connect(websocket, user)
-    
+    await manager.connect(websocket, room="global")
+
     try:
         while True:
             await websocket.send_json({
@@ -139,7 +139,7 @@ async def websocket_health(websocket: WebSocket, token: str = None):
             })
             await asyncio.sleep(30)
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        manager.disconnect(websocket, room="global")
 
 
 @router.websocket("/ws/logs/{container_id}")

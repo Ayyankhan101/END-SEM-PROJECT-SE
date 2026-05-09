@@ -6,13 +6,16 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 import logging
 
+from app.core.security import get_current_user
+from app.api.endpoints import require_admin
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/metrics", tags=["monitoring"])
 
 
 @router.get("/performance")
-async def get_performance_metrics():
+async def get_performance_metrics(current_user: dict = Depends(get_current_user)):
     """
     Get API performance metrics.
     
@@ -84,7 +87,7 @@ async def get_performance_metrics():
 
 
 @router.get("/simple")
-async def get_simple_metrics():
+async def get_simple_metrics(current_user: dict = Depends(get_current_user)):
     """
     Get simplified metrics for dashboard display.
     Returns total requests and average response time.
@@ -107,7 +110,7 @@ async def get_simple_metrics():
 
 
 @router.post("/reset")
-async def reset_metrics():
+async def reset_metrics(current_user: dict = Depends(require_admin)):
     """
     Reset all collected metrics.
     Use with caution - this clears all performance history.
@@ -122,7 +125,7 @@ async def reset_metrics():
 
 
 @router.get("/summary")
-async def get_resource_summary():
+async def get_resource_summary(current_user: dict = Depends(get_current_user)):
     """
     Get resource usage summary across all containers.
     Returns total containers, running/stopped counts, CPU/memory usage,
@@ -186,6 +189,7 @@ async def export_metrics(
     container_id: str = None,
     hours: int = 24,
     format: str = "json",
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Export metrics data.

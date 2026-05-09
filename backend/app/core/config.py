@@ -97,7 +97,7 @@ class ServerConfig(BaseModel):
 
 class SecurityConfig(BaseModel):
     jwt_secret: str = ""  # Must be set via get_default_jwt_secret()
-    jwt_algorithm: str = "HS256"
+    jwt_algorithm: str = "RS256"  # Matches actual signing in security.py
     jwt_expiration_hours: int = 24
     
     def __init__(self, **data):

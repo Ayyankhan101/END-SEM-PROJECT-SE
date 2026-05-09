@@ -105,13 +105,17 @@ class ApiClient {
           return Promise.reject(error)
         }
 
-        // Handle rate limiting
+        // Handle rate limiting (max 3 retries)
         if (error.response?.status === 429) {
-          const retryAfter = error.response.headers['retry-after']
-          if (retryAfter) {
-            const delay = parseInt(retryAfter) * 1000
-            await new Promise(resolve => setTimeout(resolve, delay))
-            return this.client(originalRequest)
+          const config = originalRequest as AxiosRequestConfig & { _retryCount?: number }
+          config._retryCount = (config._retryCount ?? 0) + 1
+          if (config._retryCount <= 3) {
+            const retryAfter = error.response.headers['retry-after']
+            if (retryAfter) {
+              const delay = parseInt(retryAfter) * 1000
+              await new Promise(resolve => setTimeout(resolve, delay))
+              return this.client(config)
+            }
           }
         }
 
@@ -131,6 +135,10 @@ class ApiClient {
   async login(credentials: LoginRequest): Promise<TokenResponse> {
     const response = await this.client.post<TokenResponse>('/auth/token', credentials)
     return response.data
+  }
+
+  async changePasswordFirstLogin(data: { username: string; old_password: string; new_password: string }): Promise<void> {
+    await this.client.post('/auth/change-password-first-login', data)
   }
 
   // Container endpoints

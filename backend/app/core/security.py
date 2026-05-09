@@ -193,6 +193,23 @@ def verify_token(token: str) -> dict:
             algorithms=["RS256"],
             options={"require": ["exp", "iat", "type"]},
         )
+        # Check per-user revocation timestamp
+        username = payload.get("sub")
+        iat = payload.get("iat")
+        if username and iat:
+            from app.db.models import get_session, User
+            db = get_session()
+            try:
+                user = db.query(User).filter(User.username == username).first()
+                if user and getattr(user, "tokens_revoked_at", None):
+                    if datetime.utcfromtimestamp(iat) < user.tokens_revoked_at:
+                        raise HTTPException(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Token has been revoked",
+                            headers={"WWW-Authenticate": "Bearer"},
+                        )
+            finally:
+                db.close()
         return payload
     except ExpiredSignatureError:
         raise HTTPException(
@@ -231,10 +248,20 @@ def revoke_token(token: str):
 
 
 def revoke_all_user_tokens(username: str):
-    """Revoke all user tokens by adding a 'revoked_before' timestamp to User model or similar.
-    For now, we clear the cache and rely on DB (simplified).
+    """Revoke all tokens for a specific user by storing a per-user revocation timestamp in the DB.
+    Tokens issued before that timestamp will be rejected on next use.
     """
-    _token_blacklist_cache.clear()
+    from app.db.models import get_session, User
+    db = get_session()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if user:
+            user.tokens_revoked_at = datetime.utcnow()
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to revoke user tokens for {username}: {e}")
+    finally:
+        db.close()
 
 
 async def get_current_user(
@@ -252,11 +279,11 @@ async def get_current_user(
     return payload
 
 
-def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
+async def get_current_user_optional(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[dict]:
     """Optional user auth for public endpoints."""
     if not credentials:
         return None
-    return get_current_user(credentials)
+    return await get_current_user(credentials)
 
 
 def get_user_role(token_data: dict) -> Optional[str]:
@@ -294,14 +321,6 @@ def create_initial_user():
         )
         db.add(user)
         db.commit()
-        logger.warning("=" * 60)
-        logger.warning("INITIAL USER CREATED - PASSWORD CHANGE REQUIRED")
-        logger.warning("Username: admin")
-        logger.warning("Password: %s", password)
-        logger.warning("=" * 60)
-        logger.warning("INITIAL USER CREATED - PASSWORD CHANGE REQUIRED")
-        logger.warning("Username: admin")
-        logger.warning("Password: %s", password)
         logger.warning("=" * 60)
         logger.warning("INITIAL USER CREATED - PASSWORD CHANGE REQUIRED")
         logger.warning("Username: admin")

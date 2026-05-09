@@ -218,9 +218,11 @@ export interface LoginRequest {
 
 export interface TokenResponse {
   access_token: string;
+  refresh_token?: string;
   token_type: string;
   requires_2fa?: boolean;
   user_id?: number;
+  must_change_password?: boolean;
 }
 
 // Settings types

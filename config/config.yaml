@@ -1,7 +1,7 @@
 docker:
   # socket_path: (can be overridden via DOCKWATCH_DOCKER_SOCKET env var)
   socket_path: "/var/run/docker.sock"
-  api_version: "1.51"
+  api_version: "1.47"
   poll_interval: 5
   max_containers: 50
 

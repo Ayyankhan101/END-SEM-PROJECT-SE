@@ -25,7 +25,7 @@ def ensure_docker_connected(monitor):
 
 
 @router.get("/health")
-async def ai_health_check():
+async def ai_health_check(current_user: dict = Depends(get_current_user)):
     """Check AI services availability."""
     import os
     ollama = get_ollama_client()
@@ -43,7 +43,7 @@ async def ai_health_check():
 
 
 @router.get("/anomalies")
-async def get_anomalies():
+async def get_anomalies(current_user: dict = Depends(get_current_user)):
     """Get detected anomalies."""
     from app.services.docker_monitor import get_docker_monitor
     
@@ -161,7 +161,7 @@ async def analyze_container(
 
 
 @router.get("/remediation/{container_id}")
-async def get_remediation(container_id: str):
+async def get_remediation(container_id: str, current_user: dict = Depends(get_current_user)):
     """Get remediation plan for a container."""
     from app.services.docker_monitor import get_docker_monitor
     
@@ -215,7 +215,7 @@ async def get_remediation(container_id: str):
 
 
 @router.get("/insights")
-async def get_ai_insights():
+async def get_ai_insights(current_user: dict = Depends(get_current_user)):
     """Get overall AI insights dashboard."""
     from app.services.docker_monitor import get_docker_monitor
     
