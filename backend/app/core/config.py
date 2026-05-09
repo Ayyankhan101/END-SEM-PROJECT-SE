@@ -163,6 +163,12 @@ def load_config(config_path: Optional[str] = None) -> Config:
             data["security"] = {}
         data["security"]["jwt_secret"] = jwt_secret
 
+    db_path = os.environ.get("DOCKWATCH_DB_PATH")
+    if db_path:
+        if "database" not in data:
+            data["database"] = {}
+        data["database"]["path"] = db_path
+
     _config = Config(**data)
     return _config
 
