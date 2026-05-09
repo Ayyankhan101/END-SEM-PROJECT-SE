@@ -137,9 +137,6 @@ class ApiClient {
     return response.data
   }
 
-  async changePasswordFirstLogin(data: { username: string; old_password: string; new_password: string }): Promise<void> {
-    await this.client.post('/auth/change-password-first-login', data)
-  }
 
   // Container endpoints
   async getContainers(search?: string, statusFilter?: string): Promise<Container[]> {

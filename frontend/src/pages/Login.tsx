@@ -43,7 +43,7 @@ function Login() {
           setIsLoading(false)
           return
         }
-        await api.changePasswordFirstLogin({ username, old_password: password, new_password: newPassword })
+        await api.changePasswordFirstLogin(username, password, newPassword)
         const data = await api.login({ username, password: newPassword })
         authLogin(data.access_token, data.user_id, data.refresh_token)
         navigate('/')
