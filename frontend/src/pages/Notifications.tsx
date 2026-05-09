@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
 import api from '@/services/api'
 import type { NotificationChannel } from '@/types'
+import Header from '@/components/Header'
+import { Bell } from 'lucide-react'
+import { useAuth } from '@/App'
 
 export default function Notifications() {
+  const { isConnected, logout } = useAuth()
   const [channels, setChannels] = useState<NotificationChannel[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -87,12 +91,20 @@ export default function Notifications() {
   }
 
   return (
-    <div className="p-6">
+    <div className="app-surface">
+      <Header
+        title="Notifications"
+        icon={<Bell size={24} />}
+        isConnected={isConnected}
+        onLogout={logout}
+      />
+      <main className="app-main">
+      <div className="dashboard-card">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Notification Channels</h1>
+        <h1 className="text-2xl font-bold text-[#111827] dark:text-white">Notification Channels</h1>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
+          className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 text-white"
         >
           {showForm ? 'Cancel' : 'Add Channel'}
         </button>
@@ -199,6 +211,8 @@ export default function Notifications() {
           ))}
         </div>
       )}
+      </div>
+      </main>
     </div>
   )
 }

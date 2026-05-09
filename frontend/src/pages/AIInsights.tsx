@@ -1,17 +1,17 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/App'
 import { api } from '@/services/api'
-import { 
-  Cpu, 
-  MemoryStick, 
-  AlertTriangle, 
-  RefreshCw, 
-  Activity, 
+import Header from '@/components/Header'
+import {
+  Cpu,
+  MemoryStick,
+  AlertTriangle,
+  RefreshCw,
+  Activity,
   Zap,
   Brain,
   CheckCircle,
-  XCircle,
-  ArrowRight
+  XCircle
 } from 'lucide-react'
 
 interface Anomaly {
@@ -50,7 +50,7 @@ interface InsightsSummary {
 }
 
 function AIInsights() {
-  const { logout } = useAuth()
+  const { logout, isConnected } = useAuth()
   const [loading, setLoading] = useState<boolean>(true)
   const [insights, setInsights] = useState<{
     summary: InsightsSummary
@@ -102,34 +102,31 @@ function AIInsights() {
 
   if (loading && !insights) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <RefreshCw className="w-8 h-8 animate-spin text-accent" />
+      <div className="app-surface">
+        <Header title="AI Insights" icon={<Brain size={24} />} isConnected={isConnected} onLogout={logout} />
+        <main className="app-main">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <RefreshCw className="w-8 h-8 animate-spin text-blue-400" />
+          </div>
+        </main>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-3">
-            <Brain className="w-7 h-7 text-accent" />
-            AI Insights
-          </h1>
-          <p className="text-dim mt-1">Anomaly detection and remediation</p>
-        </div>
-        <button
-          onClick={fetchInsights}
-          className="p-2 hover:bg-card rounded-lg transition-colors"
-          title="Refresh"
-        >
-          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-
-      <div className="flex items-center gap-2 p-3 bg-card rounded-lg border border-border">
+    <div className="app-surface">
+      <Header
+        title="AI Insights"
+        icon={<Brain size={24} />}
+        onRefresh={fetchInsights}
+        isConnected={isConnected}
+        onLogout={logout}
+      />
+      <main className="app-main">
+      <div className="space-y-6">
+      <div className="flex items-center gap-2 p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700">
         <div className={`w-2 h-2 rounded-full ${insights?.provider_available ? 'bg-green-500' : 'bg-red-500'}`} />
-        <span className="text-sm">
+        <span className="text-sm text-slate-700 dark:text-slate-300">
           {insights?.provider_name?.toUpperCase() || 'AI'}: {insights?.provider_available ? 'Connected' : 'Unavailable'}
         </span>
       </div>
@@ -140,66 +137,66 @@ function AIInsights() {
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="flex items-center gap-2 text-dim text-sm">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="dashboard-card p-4">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
             <Cpu className="w-4 h-4" /> Containers
           </div>
-          <div className="text-2xl font-bold mt-1">{insights?.summary.total_containers || 0}</div>
+          <div className="text-2xl font-bold mt-1 text-[#111827] dark:text-white">{insights?.summary.total_containers || 0}</div>
         </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="flex items-center gap-2 text-dim text-sm">
+        <div className="dashboard-card p-4">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
             <AlertTriangle className="w-4 h-4" /> Anomalies
           </div>
-          <div className="text-2xl font-bold mt-1">{insights?.summary.anomaly_count || 0}</div>
+          <div className="text-2xl font-bold mt-1 text-[#111827] dark:text-white">{insights?.summary.anomaly_count || 0}</div>
         </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="flex items-center gap-2 text-dim text-sm">
+        <div className="dashboard-card p-4">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
             <Zap className="w-4 h-4" /> Critical
           </div>
           <div className="text-2xl font-bold text-red-500">{insights?.summary.severity_breakdown.critical || 0}</div>
         </div>
-        <div className="bg-card p-4 rounded-lg border border-border">
-          <div className="flex items-center gap-2 text-dim text-sm">
+        <div className="dashboard-card p-4">
+          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-sm">
             <MemoryStick className="w-4 h-4" /> High
           </div>
           <div className="text-2xl font-bold text-orange-500">{insights?.summary.severity_breakdown.high || 0}</div>
         </div>
       </div>
 
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
-        <div className="p-4 border-b border-border">
-          <h2 className="font-semibold">Detected Anomalies</h2>
+      <div className="dashboard-card overflow-hidden">
+        <div className="p-4 border-b border-slate-200 dark:border-slate-700">
+          <h2 className="font-semibold text-[#111827] dark:text-white">Detected Anomalies</h2>
         </div>
-        
+
         {(!insights?.anomalies || insights.anomalies.length === 0) ? (
           <div className="p-8 text-center">
             <CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-3" />
-            <p className="text-dim">No anomalies detected</p>
-            <p className="text-sm text-dim mt-1">All containers are healthy</p>
+            <p className="text-slate-500 dark:text-slate-400">No anomalies detected</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">All containers are healthy</p>
           </div>
         ) : (
-          <div className="divide-y divide-border">
+          <div className="divide-y divide-slate-200 dark:divide-slate-700">
             {insights.anomalies.map((item, idx) => (
               <div key={idx} className="p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
                       {getSeverityIcon(item.anomaly.severity)}
-                      <span className="font-medium">{item.anomaly.container_name}</span>
+                      <span className="font-medium text-[#111827] dark:text-white">{item.anomaly.container_name}</span>
                       <span className={`px-2 py-0.5 text-xs rounded border ${getSeverityColor(item.anomaly.severity)}`}>
                         {item.anomaly.severity}
                       </span>
                     </div>
-                    <p className="text-sm text-dim mt-1">{item.anomaly.message}</p>
-                    
-                    <div className="mt-3 p-3 bg-bg rounded border border-border">
-                      <p className="text-sm font-medium mb-2">Remediation</p>
-                      <p className="text-sm text-dim">{item.remediation.reasoning}</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{item.anomaly.message}</p>
+
+                    <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded border border-slate-200 dark:border-slate-700">
+                      <p className="text-sm font-medium mb-2 text-[#111827] dark:text-white">Remediation</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">{item.remediation.reasoning}</p>
                       <ol className="mt-2 space-y-1">
                         {item.remediation.steps.map((step, sIdx) => (
-                          <li key={sIdx} className="text-sm text-dim flex items-start gap-2">
-                            <span className="text-accent">{sIdx + 1}.</span>
+                          <li key={sIdx} className="text-sm text-slate-500 dark:text-slate-400 flex items-start gap-2">
+                            <span className="text-blue-500">{sIdx + 1}.</span>
                             {step.replace(/^\d+\.\s*/, '')}
                           </li>
                         ))}
@@ -212,6 +209,8 @@ function AIInsights() {
           </div>
         )}
       </div>
+      </div>
+      </main>
     </div>
   )
 }

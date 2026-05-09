@@ -114,9 +114,6 @@ export default function DockerResources() {
       const image = images.find(i => i.id === imageId)
       if (!image) return
       
-      const [oldRepo, oldTag = 'latest'] = image.tags[0]?.split(':') || [imageId, 'latest']
-      
-      await api.pullImage(oldRepo, oldTag)
       await api.tagImage(imageId, newTag)
       
       setShowTagForm(false)
