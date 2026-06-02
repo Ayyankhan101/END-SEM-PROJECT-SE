@@ -64,9 +64,12 @@ async def trivy_health_check(current_user: dict = Depends(get_current_user)):
         result = subprocess.run(
             ["docker", "images", "aquasec/trivy:latest", "-q"],
             capture_output=True,
+            text=True,
             timeout=10
         )
-        available = result.returncode == 0
+        # docker images returns code 0 even when image absent; image
+        # present only if it prints an ID to stdout.
+        available = result.returncode == 0 and bool(result.stdout.strip())
     except Exception:
         available = False
     
