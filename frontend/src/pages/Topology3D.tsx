@@ -74,7 +74,9 @@ export default function Topology() {
     const w = mount.clientWidth
     const h = mount.clientHeight || 400
     const camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 100)
-    camera.position.set(0, 3, 8)
+    // Distance scales with node count so the whole grid stays in frame.
+    const dist = 4 + Math.ceil(Math.sqrt(containerNodes.length)) * 1.1
+    camera.position.set(0, dist * 0.45, dist)
     camera.lookAt(0, 0, 0)
 
     let renderer: THREE.WebGLRenderer
@@ -88,66 +90,148 @@ export default function Topology() {
     renderer.setClearColor(0x0a0a0f, 1)
     mount.appendChild(renderer.domElement)
 
-    const runningContainers = containerNodes.filter(c => c.status === 'running')
-    const spacing = Math.max(2, Math.min(4, runningContainers.length))
-    const nodeMap = new Map<string, THREE.Mesh>()
+    // Build a text-label sprite from a canvas texture.
+    const makeLabel = (text: string): THREE.Sprite => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')!
+      const font = 48
+      ctx.font = `bold ${font}px sans-serif`
+      const pad = 24
+      const tw = ctx.measureText(text).width
+      canvas.width = tw + pad * 2
+      canvas.height = font + pad
+      // redraw after resize
+      ctx.font = `bold ${font}px sans-serif`
+      ctx.fillStyle = 'rgba(10,10,20,0.75)'
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillStyle = '#ffffff'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(text, pad, canvas.height / 2)
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.minFilter = THREE.LinearFilter
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })
+      const sprite = new THREE.Sprite(mat)
+      const h = 0.45
+      const aspect = canvas.width / canvas.height
+      sprite.scale.set(aspect * h, h, 1)
+      sprite.position.set(0, 0.55, 0)
+      return sprite
+    }
 
-    runningContainers.forEach((container, index) => {
-      const geo = new THREE.SphereGeometry(0.3, 32, 32)
-      const cpu = container.cpu || 0
-      const color = cpu > 75 ? 0xff4444 : cpu > 50 ? 0xffaa44 : cpu > 25 ? 0x44ff88 : 0x44aaff
-      const mat = new THREE.MeshPhongMaterial({
-        color,
-        emissive: new THREE.Color(color).multiplyScalar(0.3),
-        shininess: 80
-      })
-      const mesh = new THREE.Mesh(geo, mat)
-      const row = Math.floor(index / spacing)
-      const col = index % spacing
-      const x = (col - (spacing - 1) / 2) * 1.8
-      const z = (row - Math.floor(runningContainers.length / spacing) / 2) * 1.8
-      const y = Math.sin(index * 0.5) * 0.3
-      mesh.position.set(x, y, z)
-      scene.add(mesh)
-      nodeMap.set(container.id, mesh)
-    })
+    // Wider grid + larger gap so labels don't pile on top of each other.
+    const cols = Math.ceil(Math.sqrt(containerNodes.length))
+    const spacing = cols
+    const gap = 2.8
+    const nodeMap = new Map<string, THREE.Mesh>()
+    const draggable: THREE.Mesh[] = []
 
     containerNodes.forEach((container, index) => {
-      if (container.status !== 'running') {
-        const geo = new THREE.BoxGeometry(0.4, 0.4, 0.4)
-        const mat = new THREE.MeshLambertMaterial({ color: 0x666666 })
-        const mesh = new THREE.Mesh(geo, mat)
-        const row = Math.floor(index / spacing)
-        const col = index % spacing
-        mesh.position.set(
-          (col - (spacing - 1) / 2) * 1.8,
-          0,
-          (row - Math.floor(containerNodes.length / spacing) / 2) * 1.8
+      const running = container.status === 'running'
+      let mesh: THREE.Mesh
+      if (running) {
+        const cpu = container.cpu || 0
+        const color = cpu > 75 ? 0xff4444 : cpu > 50 ? 0xffaa44 : cpu > 25 ? 0x44ff88 : 0x44aaff
+        mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(0.3, 32, 32),
+          new THREE.MeshPhongMaterial({
+            color,
+            emissive: new THREE.Color(color).multiplyScalar(0.3),
+            shininess: 80
+          })
         )
-        scene.add(mesh)
+      } else {
+        mesh = new THREE.Mesh(
+          new THREE.BoxGeometry(0.4, 0.4, 0.4),
+          new THREE.MeshLambertMaterial({ color: 0x666666 })
+        )
       }
+      const row = Math.floor(index / spacing)
+      const col = index % spacing
+      const rows = Math.ceil(containerNodes.length / spacing)
+      const x = (col - (spacing - 1) / 2) * gap
+      const z = (row - (rows - 1) / 2) * gap
+      const y = running ? Math.sin(index * 0.5) * 0.3 : 0
+      mesh.position.set(x, y, z)
+      mesh.add(makeLabel(container.name))
+      scene.add(mesh)
+      nodeMap.set(container.id, mesh)
+      draggable.push(mesh)
     })
 
-    nodeMap.forEach((mesh) => {
-      const connected = containerNodes.slice(0, 3)
-      connected.forEach((_, i) => {
-        const otherMesh = Array.from(nodeMap.values())[i]
-        if (otherMesh && otherMesh !== mesh) {
-          const points = [mesh.position, otherMesh.position]
-          const curve = new THREE.LineCurve3(points[0], points[1])
-          const tubeGeo = new THREE.TubeGeometry(curve, 8, 0.02, 4, false)
-          const tubeMat = new THREE.MeshBasicMaterial({ color: 0x4466aa, transparent: true, opacity: 0.3 })
-          scene.add(new THREE.Mesh(tubeGeo, tubeMat))
+    // Connection lines (recomputed each frame so they follow dragged nodes).
+    const meshList = Array.from(nodeMap.values())
+    const links: { a: THREE.Mesh; b: THREE.Mesh; line: THREE.Line }[] = []
+    meshList.forEach((mesh) => {
+      meshList.slice(0, 3).forEach((other) => {
+        if (other !== mesh) {
+          const geom = new THREE.BufferGeometry().setFromPoints([mesh.position.clone(), other.position.clone()])
+          const line = new THREE.Line(
+            geom,
+            new THREE.LineBasicMaterial({ color: 0x4466aa, transparent: true, opacity: 0.35 })
+          )
+          scene.add(line)
+          links.push({ a: mesh, b: other, line })
         }
       })
     })
+
+    // --- Drag interaction ---
+    const raycaster = new THREE.Raycaster()
+    const pointer = new THREE.Vector2()
+    const dragPlane = new THREE.Plane()
+    const hit = new THREE.Vector3()
+    const offset = new THREE.Vector3()
+    const camDir = new THREE.Vector3()
+    let dragged: THREE.Mesh | null = null
+    const dom = renderer.domElement
+
+    const setPointer = (e: PointerEvent) => {
+      const rect = dom.getBoundingClientRect()
+      pointer.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      pointer.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+    }
+    const onDown = (e: PointerEvent) => {
+      setPointer(e)
+      raycaster.setFromCamera(pointer, camera)
+      const hits = raycaster.intersectObjects(draggable, false)
+      if (hits.length) {
+        dragged = hits[0].object as THREE.Mesh
+        camera.getWorldDirection(camDir)
+        dragPlane.setFromNormalAndCoplanarPoint(camDir.clone().negate(), dragged.position)
+        if (raycaster.ray.intersectPlane(dragPlane, hit)) offset.copy(hit).sub(dragged.position)
+        dom.style.cursor = 'grabbing'
+      }
+    }
+    const onMove = (e: PointerEvent) => {
+      if (!dragged) {
+        setPointer(e)
+        raycaster.setFromCamera(pointer, camera)
+        dom.style.cursor = raycaster.intersectObjects(draggable, false).length ? 'grab' : 'default'
+        return
+      }
+      setPointer(e)
+      raycaster.setFromCamera(pointer, camera)
+      if (raycaster.ray.intersectPlane(dragPlane, hit)) dragged.position.copy(hit.sub(offset))
+    }
+    const onUp = () => {
+      dragged = null
+      dom.style.cursor = 'default'
+    }
+    dom.addEventListener('pointerdown', onDown)
+    dom.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
 
     // Render loop
     let animId: number
     const animate = () => {
       animId = requestAnimationFrame(animate)
-      // Slow orbit rotation
-      scene.rotation.y += 0.003
+      // Keep connection lines attached to (possibly moved) nodes.
+      links.forEach(({ a, b, line }) => {
+        const pos = line.geometry.attributes.position as THREE.BufferAttribute
+        pos.setXYZ(0, a.position.x, a.position.y, a.position.z)
+        pos.setXYZ(1, b.position.x, b.position.y, b.position.z)
+        pos.needsUpdate = true
+      })
       renderer.render(scene, camera)
     }
     animate()
@@ -165,6 +249,9 @@ export default function Topology() {
     return () => {
       cancelAnimationFrame(animId)
       window.removeEventListener('resize', onResize)
+      dom.removeEventListener('pointerdown', onDown)
+      dom.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
       renderer.dispose()
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
     }
