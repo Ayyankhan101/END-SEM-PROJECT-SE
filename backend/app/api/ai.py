@@ -32,12 +32,12 @@ async def ai_health_check(current_user: dict = Depends(get_current_user)):
     ollama_available = ollama.health_check()
     
     provider = os.getenv("AI_PROVIDER", "ollama").lower()
-    
+
     return {
         provider: {
             "available": ollama_available,
             "model": ollama.model,
-            "endpoint": ollama.base_url
+            "endpoint": ollama.endpoint
         }
     }
 
