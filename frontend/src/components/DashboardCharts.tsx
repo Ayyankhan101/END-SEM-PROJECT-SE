@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import {
   Area,
   Bar,
@@ -11,7 +10,7 @@ import {
   XAxis,
   YAxis
 } from 'recharts'
-import { Activity, Cpu, HardDrive, X, Download } from 'lucide-react'
+import { Activity, Cpu, HardDrive } from 'lucide-react'
 import type { Container } from '@/types'
 
 interface DashboardChartsProps {
@@ -25,75 +24,55 @@ interface FleetPoint {
   statusScore: number;
 }
 
-function getMetricValue(
-  container: Container,
-  key: 'cpu_percent' | 'memory_percent',
-  fallback: number
-) {
+function getMetricValue(container: Container, key: 'cpu_percent' | 'memory_percent', fallback: number) {
   const value = (container as any)[key]
-  const realValue =
-    typeof value === 'number' && Number.isFinite(value)
-      ? Number(value.toFixed(1))
-      : 0
-
-  return realValue > 0 ? realValue : fallback
+  const realValue = typeof value === 'number' && Number.isFinite(value) ? Number(value.toFixed(1)) : 0
+  return realValue > 0 ? realValue : (fallback > 0 ? Math.max(fallback, 0.01) : 0)
 }
 
 export default function DashboardCharts({ containers }: DashboardChartsProps) {
-  const [fullscreenChart, setFullscreenChart] =
-    useState<'main' | 'status' | null>(null)
-
-  useEffect(() => {
-    document.body.style.overflow = fullscreenChart ? 'hidden' : 'unset'
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
-  }, [fullscreenChart])
-
   const source = containers.slice(0, 12)
+  const chartData: FleetPoint[] = source.length
+    ? source.map((container, index) => ({
+        name: container.name || container.id.slice(0, 8),
+        cpu: getMetricValue(container, 'cpu_percent', 0),
+        memory: getMetricValue(container, 'memory_percent', 0),
+        statusScore: container.status === 'running' ? 100 : 0
+      }))
+    : [
+        { name: 'No containers', cpu: 0, memory: 0, statusScore: 0 }
+      ]
 
-  const chartData: FleetPoint[] =
-    source.length > 0
-      ? source.map(container => ({
-          name: container.name || container.id.slice(0, 8),
-          cpu: getMetricValue(container, 'cpu_percent', 0),
-          memory: getMetricValue(container, 'memory_percent', 0),
-          statusScore: container.status === 'running' ? 100 : 0
-        }))
-      : [{ name: 'No containers', cpu: 0, memory: 0, statusScore: 0 }]
-
-  const running = containers.filter(c => c.status === 'running').length
+  const running = containers.filter(container => container.status === 'running').length
   const stopped = Math.max(containers.length - running, 0)
-
   const statusData = [
     { name: 'Running', count: running },
     { name: 'Stopped', count: stopped }
   ]
 
-  const maxCpu = chartData.length ? Math.max(...chartData.map(d => d.cpu)) : 0
-  const maxMemory = chartData.length ? Math.max(...chartData.map(d => d.memory)) : 0
-  const yMax = Math.max(10, Math.ceil(Math.max(maxCpu, maxMemory) * 1.1))
+  // Calculate dynamic Y-axis for main chart
+  const maxCpu = chartData.length > 0 ? Math.max(...chartData.map(d => d.cpu)) : 0
+  const maxMemory = chartData.length > 0 ? Math.max(...chartData.map(d => d.memory)) : 0
+  const maxValue = Math.max(maxCpu, maxMemory)
+  const yMax = Math.max(Math.ceil(maxValue * 1.1), 10) // Minimum 10 for visibility
 
-  const statusYMax = Math.max(
-    5,
-    Math.ceil(Math.max(...statusData.map(d => d.count)) * 1.1)
-  )
+  // Calculate dynamic Y-axis for status chart
+  const maxCount = statusData.length > 0 ? Math.max(...statusData.map(d => d.count)) : 0
+  const statusYMax = Math.max(Math.ceil(maxCount * 1.1), 5) // Minimum 5 for visibility
 
-  // FIXED TOOLTIP (Recharts-safe, no TS break)
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const tooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null
-
     return (
-      <div className="rounded-xl border border-[#374151] bg-[#0b1120]/95 px-4 py-3 text-sm text-[#e5e7eb] shadow-2xl">
+      <div className="rounded-xl border border-[#374151] bg-[#0b1120]/95 px-4 py-3 text-sm text-[#e5e7eb] shadow-2xl shadow-black/40 backdrop-blur">
         <p className="mb-2 font-semibold">{label}</p>
-
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {payload.map((item: any) => (
-            <div key={item.dataKey} className="flex justify-between gap-6">
-              <span className="text-[#9ca3af]">{item.name}</span>
-              <span className="text-white font-semibold">
-                {item.value}{item.dataKey === 'count' ? '' : '%'}
+            <div key={item.dataKey} className="flex min-w-40 items-center justify-between gap-6">
+              <span className="flex items-center gap-2 text-[#9ca3af]">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                {item.name}
               </span>
+              <span className="font-semibold text-white">{item.value}{item.dataKey === 'count' ? '' : '%'}</span>
             </div>
           ))}
         </div>
@@ -101,97 +80,67 @@ export default function DashboardCharts({ containers }: DashboardChartsProps) {
     )
   }
 
-  const handleDownload = (e: React.MouseEvent) => {
-    e.stopPropagation()
-
-    const dataToExport =
-      fullscreenChart === 'main' ? chartData : statusData
-
-    if (!dataToExport.length) return
-
-    const headers = Object.keys(dataToExport[0])
-
-    const csv = [
-      headers.join(','),
-      ...dataToExport.map(row =>
-        headers
-          .map(h => {
-            const v = (row as any)[h]
-            return typeof v === 'string'
-              ? `"${v.replace(/"/g, '""')}"`
-              : v
-          })
-          .join(',')
-      )
-    ].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `fleet_${fullscreenChart || 'data'}.csv`
-    a.click()
-
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <section className="mb-6 grid gap-5">
-
-      {/* MAIN CHART */}
-      <div
-        className="dashboard-card cursor-pointer"
-        onClick={() => setFullscreenChart('main')}
-      >
-        <div className="h-[28rem]">
+      <div className="dashboard-card chart-card overflow-hidden">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-500">
+              <Activity className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-500">Fleet telemetry</p>
+              <h3 className="mt-1 text-xl font-semibold text-[#111827] dark:text-[#e5e7eb]">CPU and memory usage</h3>
+            </div>
+          </div>
+          <div className="flex gap-3 text-xs font-medium text-[#6b7280] dark:text-[#9ca3af]">
+            <span className="inline-flex items-center gap-2"><Cpu className="h-4 w-4 text-indigo-500" /> CPU</span>
+            <span className="inline-flex items-center gap-2"><HardDrive className="h-4 w-4 text-emerald-500" /> Memory</span>
+          </div>
+        </div>
+        <div className="h-[24rem] min-h-[20rem] md:h-[28rem] lg:h-[32rem]">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 6" />
-              <XAxis dataKey="name" />
-              <YAxis domain={[0, yMax]} />
-              <Tooltip content={<CustomTooltip />} />
+            <ComposedChart data={chartData} margin={{ top: 14, right: 18, left: 0, bottom: 20 }}>
+              <defs>
+                <linearGradient id="dashboardCpuArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.34} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.03} />
+                </linearGradient>
+                <linearGradient id="dashboardMemoryArea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.26} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 6" stroke="rgba(148,163,184,0.18)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} interval={0} minTickGap={10} />
+              <YAxis domain={[0, yMax]} tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} width={44} />
+              <Tooltip content={tooltip} cursor={{ stroke: 'rgba(59,130,246,0.36)', strokeDasharray: '4 4' }} />
               <Legend />
-
-              <Area dataKey="cpu" stroke="#6366f1" fill="#6366f1" />
-              <Area dataKey="memory" stroke="#10b981" fill="#10b981" />
+              <Area name="CPU" type="monotone" dataKey="cpu" fill="url(#dashboardCpuArea)" stroke="#6366f1" strokeWidth={2.6} dot={false} />
+              <Area name="Memory" type="monotone" dataKey="memory" fill="url(#dashboardMemoryArea)" stroke="#10b981" strokeWidth={2.6} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* STATUS CHART */}
-      <div
-        className="dashboard-card cursor-pointer"
-        onClick={() => setFullscreenChart('status')}
-      >
-        <div className="h-64">
+      <div className="dashboard-card chart-card overflow-hidden">
+        <div className="mb-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-500">Secondary insight</p>
+          <h3 className="mt-1 text-lg font-semibold text-[#111827] dark:text-[#e5e7eb]">Runtime distribution</h3>
+        </div>
+        <div className="h-64 md:h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={statusData}>
-              <XAxis dataKey="name" />
-              <YAxis domain={[0, statusYMax]} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="count" fill="#3b82f6" />
-              <Line dataKey="count" stroke="#a855f7" />
+            <ComposedChart data={statusData} margin={{ top: 10, right: 18, left: 0, bottom: 10 }}>
+              <CartesianGrid strokeDasharray="3 6" stroke="rgba(148,163,184,0.16)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis allowDecimals={false} domain={[0, statusYMax]} tick={{ fill: '#9ca3af', fontSize: 12 }} tickLine={false} axisLine={false} width={44} />
+              <Tooltip content={tooltip} cursor={{ fill: 'rgba(59,130,246,0.06)' }} />
+              <Bar name="Containers" dataKey="count" radius={[8, 8, 0, 0]} fill="#3b82f6" />
+              <Line name="Health index" dataKey="count" stroke="#a855f7" strokeWidth={2} dot={false} />
             </ComposedChart>
           </ResponsiveContainer>
         </div>
       </div>
-
-      {/* FULLSCREEN */}
-      {fullscreenChart && (
-        <div
-          className="fixed inset-0 z-50 bg-black/90"
-          onClick={() => setFullscreenChart(null)}
-        >
-          <button onClick={handleDownload}>
-            <Download />
-          </button>
-          <button onClick={() => setFullscreenChart(null)}>
-            <X />
-          </button>
-        </div>
-      )}
     </section>
   )
 }

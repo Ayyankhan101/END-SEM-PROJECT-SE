@@ -72,6 +72,23 @@ Endpoints:
 - `POST /api/webhooks/test` - Send test notification
 - `GET /api/webhooks/status` - Check webhook configuration
 
+## Testing
+
+### Selenium Login Tests
+
+```bash
+# 1. Ensure frontend is running (http://localhost:3000)
+cd selenium-tests
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Run tests
+pytest login_tests.py --verbose
+```
+
+See [selenium-tests/README.md](selenium-tests/README.md) for full details (test descriptions, troubleshooting, headless mode).
+
 ## Guides
 - [Getting Started](/docs/GETTING-STARTED.md)
 - [API Reference](/docs/API.md)

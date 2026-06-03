@@ -87,7 +87,7 @@ def get_password_hash(password: str) -> str:
 def _get_key_dir() -> Path:
     """Get or create directory for JWT keys."""
     from pathlib import Path
-    key_dir = Path("/var/run/dockwatch")
+    key_dir = Path(os.getenv("DOCKWATCH_KEY_DIR", "/tmp/dockwatch"))
     key_dir.mkdir(parents=True, exist_ok=True)
     return key_dir
 
@@ -115,14 +115,15 @@ def _get_private_key() -> str:
 def _get_public_key() -> str:
     """Get RSA public key."""
     from pathlib import Path
-    pub_file = Path("/var/run/dockwatch/jwt_public.pem")
+    key_dir = _get_key_dir()
+    pub_file = key_dir / "jwt_public.pem"
     if pub_file.exists():
         return pub_file.read_text()
     # Fallback: generate keys
     private_pem, public_pem = _generate_rsa_keys()
-    Path("/var/run/dockwatch").mkdir(parents=True, exist_ok=True)
-    Path("/var/run/dockwatch/jwt_private.pem").write_text(private_pem)
-    Path("/var/run/dockwatch/jwt_private.pem").chmod(0o600)
+    key_dir.mkdir(parents=True, exist_ok=True)
+    (key_dir / "jwt_private.pem").write_text(private_pem)
+    (key_dir / "jwt_private.pem").chmod(0o600)
     pub_file.write_text(public_pem)
     pub_file.chmod(0o644)
     logger.info("Generated new RSA key pair for JWT")

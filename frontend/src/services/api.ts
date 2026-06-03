@@ -72,6 +72,11 @@ class ApiClient {
 
         // Handle 401 Unauthorized
         if (error.response?.status === 401 && !originalRequest._retry) {
+          // Don't intercept login endpoint — let the component handle auth errors
+          if (originalRequest.url === '/auth/token') {
+            return Promise.reject(error)
+          }
+
           originalRequest._retry = true
           
           const refreshToken = localStorage.getItem('refresh_token')

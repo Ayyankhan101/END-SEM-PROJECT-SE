@@ -1,0 +1,139 @@
+DOCKWATCH FRONTEND — TECH STACK & ARCHITECTURE
+===============================================
+
+1. BUILD TOOL
+--------------
+Vite 5 — Fast dev server with HMR and optimized builds.
+Why: Faster than CRA/Webpack for development; native ESM support,
+     fast hot module replacement, and efficient production builds.
+
+2. LANGUAGE
+-----------
+TypeScript 5.3 — Typed superset of JavaScript.
+Why: Catches type errors at compile time, improves IDE support,
+     makes refactoring safer and code more self-documenting.
+
+3. UI FRAMEWORK
+---------------
+React 18 — Component-based UI library.
+Why: Industry standard, large ecosystem, component reusability,
+     efficient DOM updates via virtual DOM.
+
+4. ROUTING
+----------
+react-router-dom 6 — Client-side routing for SPAs.
+Why: Declarative route definitions, nested layouts, lazy loading,
+     navigation guards for protected routes (auth).
+
+5. HTTP CLIENT
+--------------
+Axios 1.6 — Promise-based HTTP client.
+Why: Automatic JSON parsing, request/response interceptors for JWT
+     token refresh and error handling, timeout config, clean API.
+
+6. STYLING
+----------
+Tailwind CSS 3 — Utility-first CSS framework.
+Why: Rapid prototyping without writing custom CSS, consistent design
+     tokens (colors, spacing, typography), small production bundle
+     via purging unused styles, responsive design built-in.
+
+7. CHARTS & DATA VISUALIZATION
+-------------------------------
+Recharts 2 — React-native charting library.
+Why: Declarative chart components that compose naturally with React,
+     supports line, bar, pie, area charts for metrics/history,
+     responsive and customizable.
+
+8. ICONS
+--------
+Lucide React — Open-source icon library.
+Why: Lightweight, tree-shakeable, consistent design language,
+     works seamlessly with Tailwind (stroke color/size props).
+
+9. REAL-TIME COMMUNICATION
+---------------------------
+socket.io-client 4 — WebSocket client with auto-reconnect.
+Why: Real-time container metrics streaming, auto-reconnect on
+     connection loss, fallback to HTTP long-polling if WebSocket
+     unavailable, room-based event subscriptions.
+
+10. 3D VISUALIZATION
+-------------------
+Three.js / @react-three/fiber — 3D rendering engine.
+Why: Interactive 3D cluster topology view, GPU-accelerated,
+     wide browser support, large ecosystem of addons.
+
+11. TERMINAL EMULATOR
+----------------------
+xterm.js — Full-featured terminal emulator.
+Why: In-browser container shell access (exec session),
+     supports ANSI escape codes, themes, and addons.
+
+12. CODE EDITOR
+---------------
+Monaco Editor (via @monaco-editor/react) — VS Code's editor.
+Why: Syntax highlighting for config files and compose YAML,
+     IntelliSense, multi-language support, familiar UX.
+
+13. TESTING
+-----------
+Vitest — Vite-native test runner (unit/integration).
+Testing Library — React component testing (user-centric).
+Why: Vitest shares Vite config for zero-config setup, runs fast.
+     Testing Library encourages testing behavior over implementation.
+
+14. VIRTUALIZED LIST
+--------------------
+Virtua — High-performance virtual scroll.
+Why: Efficiently renders large container lists without DOM bloat,
+     smooth scrolling with thousands of items.
+
+15. AUTHENTICATION FLOW
+-----------------------
+JWT-based auth stored in localStorage.
+Login -> receive access + refresh tokens -> store in AuthContext.
+Protected routes check token; 401 responses trigger refresh.
+Axios interceptor handles automatic token refresh on 401.
+
+16. STATE MANAGEMENT
+--------------------
+React Context (useAuth) for global auth state.
+No Redux — simple enough for current scope.
+Component-local state (useState) for page-specific data.
+WebSocket events update container state in real-time.
+
+17. PROJECT STRUCTURE
+---------------------
+src/
+  components/   — Reusable UI components (Header, Sidebar, ContainerCard, etc.)
+  pages/        — Route-level page components (Dashboard, Login, Containers, etc.)
+  services/     — API client (Axios instance, request interceptors)
+  contexts/     — React contexts (theme, etc.)
+  hooks/        — Custom hooks
+  types/        — TypeScript type definitions
+  utils/        — Utility functions (formatters, helpers)
+  styles/       — Global CSS / Tailwind layers
+  tests/        — Test files
+
+18. ROUTES
+----------
+/login         — Public: authentication
+/              — Protected: Dashboard (fleet overview, KPIs)
+/containers    — Protected: Container list with search/filter
+/container/:id — Protected: Container detail, logs, actions
+/hosts         — Protected: Host management
+/alerts        — Protected: Alert history
+/alert-rules   — Protected: Alert rule configuration
+/schedules     — Protected: Scheduled actions
+/stacks        — Protected: Docker Compose stack management
+/settings      — Protected: App settings (theme, notifications)
+/users         — Protected: User management (admin only)
+/audit         — Protected: Audit log
+/backup        — Protected: Backup management
+/security      — Protected: CVE scanning
+/ai            — Protected: AI insights
+/topology      — Protected: 3D cluster view
+/compare       — Protected: Container comparison
+/docker        — Protected: Docker resources (images, volumes)
+/notifications — Protected: Notification channels

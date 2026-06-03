@@ -15,7 +15,7 @@ selenium-tests/
 
 - Python 3.9+
 - Google Chrome browser installed
-- Your frontend dev server running at `http://localhost:5173`
+- Your frontend dev server running at `http://localhost:3000` (or `http://localhost:3001` for Docker deployment)
 
 ## Setup
 
@@ -46,6 +46,7 @@ Also verify that the **LOCATOR REFERENCE** IDs match your frontend.
 The project uses `id="username"` for the username field (not `id="email"`).
 
 ## Running the Tests
+ source venv/bin/activate
 
 ```bash
 # Run all tests (visible browser window)

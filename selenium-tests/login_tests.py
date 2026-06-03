@@ -11,24 +11,25 @@ Requirements (install once):
     pip install selenium pytest webdriver-manager
 """
 
+import time
+
 import pytest
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+
 
 # ---------------------------------------------------------------------------
 # CONFIGURATION — Replace these values with YOUR project's credentials
 # ---------------------------------------------------------------------------
-BASE_URL = "http://localhost:5173"
+BASE_URL = "http://localhost:3000"      # Dev: npm run dev → 3000; Docker: docker compose → 3001
 VALID_USERNAME = "admin"       # Replace with a real username in your system
 VALID_PASSWORD = "admin123"    # Replace with the correct password
 INVALID_PASSWORD = "wrongpass"
 
 # Expected page title / heading text after successful login
-DASHBOARD_INDICATOR = "Fleet Overview"
+DASHBOARD_INDICATOR = "Dashboard"
 
 # ---------------------------------------------------------------------------
 # LOCATOR REFERENCE
@@ -48,22 +49,27 @@ DASHBOARD_INDICATOR = "Fleet Overview"
 # ── Fixtures ────────────────────────────────────────────────────────────────
 
 
+_window_x = 0
+
+
 @pytest.fixture(scope="function")
 def driver():
     """
     Set up a fresh Chrome browser for every test.
+    Windows are tiled side-by-side (non-headless) for visual debugging.
 
-    - Installs ChromeDriver automatically (no manual driver management).
     - Opens the login page.
     - Clears localStorage so no stale auth token remains between tests.
     """
-    options = webdriver.ChromeOptions()
-    options.add_argument("--window-size=1280,720")
-    # ── Uncomment the next line to run Chrome in headless mode ──
-    # options.add_argument("--headless")
+    global _window_x
+    w, h = 640, 720
 
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=options)
+    options = webdriver.ChromeOptions()
+    options.add_argument(f"--window-size={w},{h}")
+    options.add_argument(f"--window-position={_window_x},0")
+    _window_x += w
+
+    driver = webdriver.Chrome(options=options)
 
     # Start each test on the login page with a clean slate
     driver.get(BASE_URL + "/login")
@@ -72,6 +78,7 @@ def driver():
 
     yield driver
 
+    time.sleep(2)
     driver.quit()
 
 
@@ -136,10 +143,11 @@ class TestLogin:
 
         # Assert — dashboard heading appears, proving we navigated to /
         heading = wait_for_element(driver, By.XPATH,
-                                   f"//*[text()='{DASHBOARD_INDICATOR}']",
+                                   f"//h1[text()='{DASHBOARD_INDICATOR}']",
                                    timeout=15)
         assert heading.is_displayed(), \
             f"Expected dashboard heading '{DASHBOARD_INDICATOR}' to be visible"
+        time.sleep(3)
 
     # ────────────────────────────────────────────────────────────────────────
     # TEST 2 — Invalid Password
@@ -167,6 +175,7 @@ class TestLogin:
         error_text = error_div.text.strip()
         assert error_text, \
             f"Expected a non-empty error message, got '{error_text}'"
+        time.sleep(3)
 
     # ────────────────────────────────────────────────────────────────────────
     # TEST 3 — Both Fields Empty  (HTML5 required validation)
